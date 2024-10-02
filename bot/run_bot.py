@@ -3,6 +3,7 @@ import yaml
 import chess
 import random
 import pandas as pd
+import threading
 import time
 
 # Carica la configurazione dal file config.yml
@@ -35,7 +36,6 @@ def choose_best_move(board):
             best_move = move
 
     return best_move
-
 
 def handle_game_bot_turn(game_id):
     """
@@ -84,38 +84,45 @@ def handle_game_bot_turn(game_id):
             rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
             client.bots.make_move(game_id, rand_move.uci())
             chess_board.push(rand_move)
-        break
+        return
 
 
 def main():
-    try:
-        # Run and keep bot active
-        events = client.bots.stream_incoming_events()
+    game_threads = []
 
-        for event in events:
-            print(event)
-            if event['type'] == 'challenge':
-                if not event['challenge']['rated']:
-                    # Accepting only unrated games for now
-                    challenge_id = event['challenge']['id']
-                    client.bots.accept_challenge(challenge_id)
+    def handle_events():
+        try:
+            events = client.bots.stream_incoming_events()
 
-            elif event['type'] == 'gameStart':
-                board_event = event['game']
-                if board_event['isMyTurn']:
-                    game_id = event['game']['id']
-                    handle_game_bot_turn(game_id)
+            for event in events:
+                print(event)
+                if event['type'] == 'challenge':
+                    if not event['challenge']['rated']:
+                        # Accepting only unrated games for now
+                        challenge_id = event['challenge']['id']
+                        client.bots.accept_challenge(challenge_id)
 
-            # Load function main again to keep bot alive
-            time.sleep(60)
-            main()
-    except berserk.exceptions.ResponseError as e:
-        if e.code == 429:
+                elif event['type'] == 'gameStart':
+                    board_event = event['game']
+                    if board_event['isMyTurn']:
+                        game_id = event['game']['id']
+                        game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id,))
+                        game_threads.append(game_thread)
+                        game_thread.start()
+
+                return
+
+        except:
             print("Rate limit exceeded. Waiting before retrying...")
-            time.sleep(90)  # Wait for 60 seconds before retrying
-            main()
+            time.sleep(90)  # Wait for 90 seconds before retrying
 
-
+    while True:
+        handle_events()
+        # Clean up finished game threads
+        game_threads = [thread for thread in game_threads if thread.is_alive()]
+        time.sleep(5)  # Adjust the sleep time as needed
+        print('Here')
+        main()
 
 
 if __name__ == "__main__":
