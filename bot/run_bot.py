@@ -100,8 +100,10 @@ def main():
         for event in events:
             print(event)
             if event['type'] == 'challenge':
-                challenge_id = event['challenge']['id']
-                client.bots.accept_challenge(challenge_id)
+                if not event['challenge']['rated']:
+                    # Accepting only unrated games for now
+                    challenge_id = event['challenge']['id']
+                    client.bots.accept_challenge(challenge_id)
 
             elif event['type'] == 'gameStart':
                 board_event = event['game']
