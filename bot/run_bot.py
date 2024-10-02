@@ -5,17 +5,16 @@ import random
 import pandas as pd
 import time
 
-# Load config.yml
+# Carica la configurazione dal file config.yml
 with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
-# Configure client
+# Configura il client di Lichess con il token di accesso
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
 
-"""
-For future updates
 def evaluate_move(board, move):
+    # Esempio di valutazione semplice: preferisci le mosse che catturano pezzi avversari
     if board.is_capture(move):
         return 10
     return 0
@@ -36,13 +35,12 @@ def choose_best_move(board):
             best_move = move
 
     return best_move
-"""
 
-def handle_game_bot_turn(game_id, board_event):
+
+def handle_game_bot_turn(game_id):
     """
     This function handles the moves on Lichess and saves moves.
     :param game_id: the game id that the bot is currently playing
-    :param board_event: event['game'] dictionary that contains if it's bot turn
     """
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
@@ -65,7 +63,7 @@ def handle_game_bot_turn(game_id, board_event):
                 chess_board.push_uci(move)
             except ValueError:
                 # Handle the case where the move is not valid (e.g., game start)
-                pass
+                continue
         # In case white has a move more, meaning it's black turn, update it with an x
         if len(list_white) != len(list_black):
             list_black.append('x')
@@ -82,14 +80,11 @@ def handle_game_bot_turn(game_id, board_event):
             client.bots.make_move(game_id, initial_move)
             chess_board.push_uci(initial_move)
         else:
-            if board_event['isMyTurn']:
-                list_legal_moves = list(chess_board.legal_moves)
-                rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
-                client.bots.make_move(game_id, rand_move.uci())
-                chess_board.push(rand_move)
-            else:
-                print('Not my turn..')
-            break
+            list_legal_moves = list(chess_board.legal_moves)
+            rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
+            client.bots.make_move(game_id, rand_move.uci())
+            chess_board.push(rand_move)
+        break
 
 
 def main():
@@ -109,7 +104,7 @@ def main():
                 board_event = event['game']
                 if board_event['isMyTurn']:
                     game_id = event['game']['id']
-                    handle_game_bot_turn(game_id, board_event)
+                    handle_game_bot_turn(game_id)
 
             # Load function main again to keep bot alive
             time.sleep(60)
