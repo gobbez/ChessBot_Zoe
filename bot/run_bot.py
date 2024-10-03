@@ -6,6 +6,9 @@ import pandas as pd
 import threading
 import time
 
+import read_fen_database
+
+
 # Carica la configurazione dal file config.yml
 with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
@@ -14,33 +17,12 @@ with open('config.yml', 'r') as config_file:
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
 
-def evaluate_move(board, move):
-    # Esempio di valutazione semplice: preferisci le mosse che catturano pezzi avversari
-    if board.is_capture(move):
-        return 10
-    return 0
 
-def choose_best_move(board):
-    legal_moves = list(board.legal_moves)
-    print('Legal moves:', legal_moves)
-    if not legal_moves:
-        return None
-
-    best_move = None
-    best_score = -float('inf')
-
-    for move in legal_moves:
-        score = evaluate_move(board, move)
-        if score > best_score:
-            best_score = score
-            best_move = move
-
-    return best_move
-
-def handle_game_bot_turn(game_id):
+def handle_game_bot_turn(game_id, fen):
     """
     This function handles the moves on Lichess and saves moves.
     :param game_id: the game id that the bot is currently playing
+    :param fen: the fen position, to pass to read_fen_database to extract move
     """
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
@@ -80,10 +62,18 @@ def handle_game_bot_turn(game_id):
             client.bots.make_move(game_id, initial_move)
             chess_board.push_uci(initial_move)
         else:
-            list_legal_moves = list(chess_board.legal_moves)
-            rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
-            client.bots.make_move(game_id, rand_move.uci())
-            chess_board.push(rand_move)
+            # Search for fen
+            next_move = read_fen_database.search_fen_in_zst(fen)
+
+            # if next_move found, then use it. Else try a random move
+            if next_move:
+                client.bots.make_move(game_id, next_move.uci())
+                chess_board.push(next_move)
+            else:
+                list_legal_moves = list(chess_board.legal_moves)
+                rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
+                client.bots.make_move(game_id, rand_move.uci())
+                chess_board.push(rand_move)
         return
 
 
@@ -95,7 +85,6 @@ def main():
             events = client.bots.stream_incoming_events()
 
             for event in events:
-                print(event)
                 if event['type'] == 'challenge':
                     if not event['challenge']['rated']:
                         # Accepting only unrated games for now
@@ -103,10 +92,11 @@ def main():
                         client.bots.accept_challenge(challenge_id)
 
                 elif event['type'] == 'gameStart':
+                    fen = event['game']['fen']
                     board_event = event['game']
                     if board_event['isMyTurn']:
                         game_id = event['game']['id']
-                        game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id,))
+                        game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id, fen))
                         game_threads.append(game_thread)
                         game_thread.start()
 
