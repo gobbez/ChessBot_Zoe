@@ -18,7 +18,7 @@ def search_fen_in_zst(target_fen):
         decompressed = dctx.stream_reader(compressed_file)
         text_stream = io.TextIOWrapper(decompressed, encoding='utf-8')
 
-        # Since 9m positions is too much for my pc, i just analyze first 1000000:
+        # Since 98m positions is too much for my pc, i just analyze first 1000000:
         count = 0
         for line in text_stream:
             if count <= 1000000:

@@ -9,11 +9,11 @@ import time
 import read_fen_database
 
 
-# Carica la configurazione dal file config.yml
+# Load configuration from file config.yml
 with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
-# Configura il client di Lichess con il token di accesso
+# Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
 
