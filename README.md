@@ -1,10 +1,18 @@
 
 # ChessBot_Zoe
 
-Lichess Bot for the purpose of studying both chess and Deep Learning..
-..and challenge the Ranking of Chess-Bots!
+<table>
+  <tr>
+    <td>
+      <img src="img/LichessZoeLogo.png" alt="Chess Bot Zoe" width="250" />
+    </td>
+    <td>
+      <h1>Project Title</h1>
+      <p>Lichess Bot for the purpose of studying both chess and Deep Learning.. and challenge the Ranking of Chess-Bots!</p>
+    </td>
+  </tr>
+</table>
 
-![Chess Bot Zoe](img/LichessZoeLogo.png)
 
 ## Info
 This Chess Bot will have different styles. 
