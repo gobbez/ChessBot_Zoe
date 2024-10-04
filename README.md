@@ -7,7 +7,7 @@
       <img src="img/LichessZoeLogo.png" alt="Chess Bot Zoe" width="250" />
     </td>
     <td>
-      <h1>Project Title</h1>
+      <h1>Lichess Bot with 98+ Millions Stockfish powered positions and Ollama Chatbot (soon!)</h1>
       <p>Lichess Bot for the purpose of studying both chess and Deep Learning.. and challenge the Ranking of Chess-Bots!</p>
     </td>
   </tr>
