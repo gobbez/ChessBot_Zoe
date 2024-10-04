@@ -4,8 +4,7 @@
 Lichess Bot for the purpose of studying both chess and Deep Learning..
 ..and challenge the Ranking of Chess-Bots!
 
-![Descrizione dell'immagine](img/LichessZoeLogo.png)
-
+![Chess Bot Zoe](img/LichessZoeLogo.png)
 
 ## Info
 This Chess Bot will have different styles. 
