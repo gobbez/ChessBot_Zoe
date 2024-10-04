@@ -1,5 +1,6 @@
 
 # ChessBot_Zoe
+Lichess Bot for the purpose of studying both chess and Deep Learning.. and challenge the Ranking of Chess-Bots!
 
 <table>
   <tr>
@@ -7,8 +8,12 @@
       <img src="img/LichessZoeLogo.png" alt="Chess Bot Zoe" width="250" />
     </td>
     <td>
-      <h1>Lichess Bot with 98+ Millions Stockfish powered positions and Ollama Chatbot (soon!)</h1>
-      <p>Lichess Bot for the purpose of studying both chess and Deep Learning.. and challenge the Ranking of Chess-Bots!</p>
+      <h1>Main Features</h1>
+      <ul>
+        <li>98+ millions chess positions powered by Stockfish (working)</li>
+        <li>Different Deep Learning models on its sleeve (not used due to low %)</li>
+        <li>Ollama model to chat, interact and even teach user in the game (added soon!)</li>
+      </ul>
     </td>
   </tr>
 </table>
@@ -38,8 +43,17 @@ This is working, but the training is veeery slow (more than 5 hours) and for the
 I'm stopping this, but you can find the code in the repo.
 
 
+### Ollama Model to Chat, Interact and Teach Users (work in progress!)
 
-For now it uses Stockfish 98 million positions and, if the position isn't found (is it possible?), it just does a random move.
+The Bot will be powered by Ollama models (maybe Gemma2b) to chat with the user, analyzing position and giving hints.
+Nope, even if it wants to teach you, it wants to win at all costs too!
+
+
+#### Current version
+
+For now it uses Stockfish 98 million positions to recognize and make best move and, if the position isn't found (is it possible?), it just does a random move.
 Working to make it improve!
 
+
+##### Thanks
 Feel free to comment, and share your suggestions! :)
