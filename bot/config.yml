@@ -1,8 +1,8 @@
 token: "insert_token"
 log: "lichess-bot.log"
 engine:
-  dir: "Leela_dir"
-  name: "BanksiaGui"
+  dir: "Stockfish path"
+  name: "Stockfish file .exe"
   options:
     UCI_LimitStrength: true
     UCI_Elo: 1500

@@ -1,37 +1,25 @@
 import berserk
 import yaml
 import chess
+import chess.engine
 import random
 import pandas as pd
 import threading
 import time
 from pathlib import Path
 
-# Load df
+# Load Stockfish
 THIS_FOLDER = Path(__file__).parent.resolve()
-start_time = time.time()
-path_df_100k = THIS_FOLDER / "database/100thousandsmoves.csv"
-df_move_100k = pd.read_csv(path_df_100k)
-print(f'Loaded df_move_100k in {round(time.time() - start_time)} s')
-start_time = time.time()
-path_df_2m = THIS_FOLDER / "database/2millionmoves.csv"
-df_move_2m = pd.read_csv(path_df_2m)
-print(f'Loaded df_move_2m in {round(time.time() - start_time)} s')
-start_time = time.time()
-path_df_10m = THIS_FOLDER / "database/10millionmoves.csv"
-df_move_10m = pd.read_csv(path_df_10m)
-print(f'Loaded df_move_10m in {round(time.time() - start_time)} s')
-""" Comment since 98 millions parameter is too slow
-start_time = time.time()
-path_df_98m = THIS_FOLDER / "database/98millionmoves.csv"
-df_move_98m = pd.read_csv(path_df_98m)
-print(f'Loaded path_df_98m in {round(time.time() - start_time)} s')"""
+# Path to your Stockfish binary
+STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
+config_path = THIS_FOLDER / "config.yml"
+
 # List of active games id:
 list_playing_id = []
 
 
 # Load configuration from file config.yml
-with open('config.yml', 'r') as config_file:
+with open(config_path, 'r') as config_file:
     config = yaml.safe_load(config_file)
 
 # Configure Lichess client with token
@@ -39,32 +27,74 @@ session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
 
 
-def search_fen_from_csv(df_moves, fen):
+# STOCKFISH FUNCTIONS
+def evaluate_position_cp(fen):
     """
-    Search the best move from the csv file passing its fen
-    :param df_moves: DataFrame to pass
-    :param fen: FEN position of the game
-    :return: best move
+    Analyze the position and returns CP value (int)
+    :param fen: fen position
+    :return: CP value (int)
     """
-    # Search for FEN
-    parts = fen.split(' ')
-    search_fen = ' '.join(parts[:2])
+    global STOCKFISH_PATH
+    board = chess.Board(fen)
+    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+        info = engine.analyse(board, chess.engine.Limit(time=2.0))
+        cp = str(info['score'].relative)
+        if "#" in cp:
+            cp = cp[1:]
+            cp = int(cp) * 1000
+        else:
+            cp = int(cp)
+        return cp
 
-    # Loop and get only first match
-    count_search = 0
-    count_thousands = 0
-    for index, row in df_moves.iterrows():
-        count_search += 1
-        if count_search > 9999:
-            count_thousands += 1
-            print(count_thousands * 10000)
-            count_search = 0
 
-        if search_fen in row['Fen']:
-            return row['Move']
+def stockfish_best_move(fen, opponent_elo):
+    """
+    Stockfish analyze position and finds best move with the thinking times based on opponent_elo
+    :param fen: fen position
+    :param opponent_elo: elo of opponent
+    :return: best move for that thinking time
+    """
+    global STOCKFISH_PATH
+    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+        # Set the board position
+        board = chess.Board(fen)
 
-    # If no match is found, return None
-    return None
+        def get_deep_time():
+            # Get the best move
+            if opponent_elo <= 700:
+                deep_time = 0.2
+            elif opponent_elo <= 1000:
+                deep_time = 0.5
+            elif opponent_elo <= 1500:
+                deep_time = 1.0
+            elif opponent_elo <= 2000:
+                deep_time = 1.5
+            elif opponent_elo <= 2300:
+                deep_time = 2.3
+            elif opponent_elo <= 2500:
+                deep_time = 5.0
+            else:
+                deep_time = 10.0
+            return deep_time
+
+        # Evaluate position CP to determine how bot is playing (the worse, the more thinking time)
+        cp = evaluate_position_cp(fen)
+        if cp > 0:
+            deep_time = get_deep_time()
+        elif -50 < cp <= 0:
+            deep_time = get_deep_time() * 1.1
+        elif -100 < cp <= 50:
+            deep_time = get_deep_time() * 1.4
+        elif -200 < cp <= -100:
+            deep_time = get_deep_time() * 2
+        elif -400 < cp <= -200:
+            deep_time = get_deep_time() * 4
+        elif cp < -400:
+            deep_time = get_deep_time() * 7
+        else:
+            deep_time = get_deep_time()
+        result = engine.play(board, chess.engine.Limit(time=deep_time))
+        return result.move
 
 
 def handle_game_bot_turn(game_id, fen, elo_opponent):
@@ -78,7 +108,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent):
     move_number = 1  # Initialize move number
 
     for event in client.bots.stream_game_state(game_id):
-        print(event['id'])
+        print(f"Playing: {event['id']}")
         if 'state' not in event:
             continue  # Skip this event if it doesn't contain the 'state' key
 
@@ -113,24 +143,13 @@ def handle_game_bot_turn(game_id, fen, elo_opponent):
             chess_board.push_uci(initial_move)
             print('I made first move')
         else:
-            # Search for fen using dataset based on opponent Elo
-            if elo_opponent < 1000:
-                next_move = search_fen_from_csv(df_move_100k, fen)
-                print(f'Searched 100k, next_move: {next_move}')
-            elif elo_opponent < 1500:
-                next_move = search_fen_from_csv(df_move_2m, fen)
-                print(f'Searched 2m, next_move: {next_move}')
-            else:
-                next_move = search_fen_from_csv(df_move_10m, fen)
-                print(f'Searched 10m, next_move: {next_move}')
-            # if next_move found, then use it. Else try a random move
+            # Use Stockfish 17 to find best move
+            next_move = stockfish_best_move(fen, elo_opponent)
             if next_move:
                 try:
-                    uci_move = chess.Move.from_uci(next_move)
-                    client.bots.make_move(game_id, uci_move.uci())
-                    print('I moved')
+                    client.bots.make_move(game_id, next_move.uci())
                     chess_board.push(next_move)
-                    print('Move found, i moved')
+                    print('I moved')
                 except Exception as e:
                     print(f"Invalid move: {e}")
                     list_legal_moves = list(chess_board.legal_moves)
@@ -155,6 +174,7 @@ def main():
         try:
             events = client.bots.stream_incoming_events()
             for event in events:
+                print(event['type'])
                 if event['type'] == 'challenge':
                     if not event['challenge']['rated']:
                         print('Challenge accepted!')
@@ -165,16 +185,16 @@ def main():
                 elif event['type'] == 'gameStart':
                     board_event = event['game']
                     game_id = event['game']['id']
-                    # Check if it's Bot Turn and check if the id is not there (to prevent to open multiple threads)
+                    # Check if it's Bot Turn and if id is not in thread_list (prevent multiple threads on same game)
                     if board_event['isMyTurn'] and game_id not in list_playing_id:
                         list_playing_id.append(game_id)
                         fen = event['game']['fen']
                         elo_opponent = event['game']['opponent']['rating']
-                        print('My turn - got id, fen and elo_opponent')
+                        print('My turn')
                         game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id, fen, elo_opponent))
                         game_threads.append(game_thread)
                         game_thread.start()
-                        print('Finish thread')
+                print('Finish events loop')
                 time.sleep(5)
                 return
         except berserk.exceptions.ResponseError as e:
@@ -189,7 +209,7 @@ def main():
         handle_events()
         # Clean up finished game threads
         game_threads = [thread for thread in game_threads if thread.is_alive()]
-        time.sleep(40)  # Adjust the sleep time as needed
+        time.sleep(30)  # Adjust the sleep time as needed
         main()
 
 if __name__ == "__main__":
