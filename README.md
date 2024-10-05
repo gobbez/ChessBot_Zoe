@@ -1,6 +1,8 @@
 
 # ChessBot_Zoe
 High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking time based on opponent Elo and position evaluation.
+Human Opening Books to start as an human (work in progress)
+Ollama chatbot to interact with users (work in progress)
 
 <table>
   <tr>
@@ -14,7 +16,7 @@ High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking tim
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>
         <li>Bot can play multiple games and you can configure bullet too (as of now it's more into blitz or longer)</li>
         <li>You can configure Stockfish thinking time or implement other chess logics</li>
-        <li>Ollama model to chat, interact and even teach user in the game (added soon!)</li>
+        <li>Ollama model to chat, interact and even teach user in the game (work in progress)</li>
       </ul>
     </td>
   </tr>
@@ -46,7 +48,7 @@ Bot can play every time, but for now only blitz or longer are accepted.
 
 ### Ollama Model to Chat, Interact and Teach Users (work in progress!)
 
-The Bot will be powered by Ollama models (maybe Gemma2b) to chat with the user, analyzing position and giving hints.
+The Bot will be powered by Ollama models (maybe Gemma2b:2) to chat with the user, analyzing position and giving hints.
 Nope, even if it wants to teach you, it wants to win at all costs too!
 
 
@@ -62,11 +64,13 @@ Please note that these times can become a lot more longer in a real game in a co
 <table>
   <tr>
     <th>Stockfish</th>
-    <th>Wait time</th>
+    <th>Move wait time</th>
+    <th>Ollama chat</th>
   </tr>
   <tr>
-    <td>1 / 40 sec</td>
-    <td>30 / 40 sec</td>
+    <td>1 / 15 sec</td>
+    <td>20 / 30 sec</td>
+    <td>20 / 30 sec</td>
   </tr>
 </table>
 
@@ -75,7 +79,7 @@ Please note that these times can become a lot more longer in a real game in a co
 #### Current version
 
 For now it uses Stockfish with different analysis times in base of the opponent Elo and position evaluation.
-I'm working on adding some specific opening Repertories and Ollama for chat with the user (soon!)
+I'm working on adding some specific opening Repertories and Ollama for chat with the user
 
 Working to make it improve!
 
