@@ -109,9 +109,32 @@ def stockfish_best_move(fen, opponent_elo):
     cp = evaluate_position_cp(fen)
     deep_time, skill_level = get_level_time()
 
-    if cp > 0:
+    if cp > 800:
         pass
-    elif -50 < cp <= 0:
+    elif 600 < cp <= 800:
+        deep_time *= 0.1
+        skill_level -= 10
+    elif 400 < cp <= 600:
+        deep_time *= 0.2
+        skill_level -= 8
+    elif 300 < cp <= 400:
+        deep_time *= 0.4
+        skill_level -= 6
+    elif 200 < cp <= 300:
+        deep_time *= 0.6
+        skill_level -= 4
+    elif 100 < cp <= 200:
+        deep_time *= 0.7
+        skill_level -= 3
+    elif 50 < cp <= 100:
+        deep_time *= 0.8
+        skill_level -= 2
+    elif 0 < cp <= 50:
+        deep_time *= 0.9
+        skill_level -= 1
+    elif cp == 0:
+        pass
+    elif -50 < cp < 0:
         deep_time *= 1.1
         skill_level += 1
     elif -100 < cp <= 50:
@@ -146,6 +169,8 @@ def read_opening_book(fen):
     :return: move to play from the book
     """
     df_move = pd.read_csv(king_gambit_path)
+    parts = fen.split(' ')
+    fen = parts[0]
     df_move = df_move[df_move['Fen'].str.contains(fen)]['Move']
     for move in df_move:
         move = str(move)
@@ -200,29 +225,27 @@ def handle_game_bot_turn(game_id, fen, elo_opponent):
         else:
             # Read Opening Books before using Stockfish 17
             next_move = read_opening_book(fen)
-            if not next_move:
-                # Use Stockfish 17 to find best move
-                next_move = stockfish_best_move(fen, elo_opponent)
-            if next_move:
-                try:
+            try:
+                if next_move:
+                    # Use the move from Opening Books file
+                    client.bots.make_move(game_id, next_move)
+                    chess_board.push_uci(next_move)
+                else:
+                    # Use Stockfish 17 to find best move
+                    next_move = stockfish_best_move(fen, elo_opponent)
                     client.bots.make_move(game_id, next_move.uci())
                     chess_board.push(next_move)
                     print('I moved')
-                except Exception as e:
-                    print(f"Invalid move: {e}")
-                    list_legal_moves = list(chess_board.legal_moves)
-                    rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
-                    client.bots.make_move(game_id, rand_move.uci())
-                    chess_board.push(rand_move)
-                    print('Invalid move.. i moved random')
-
-            else:
-                print('Move not found, i go random..')
+                return
+            except Exception as e:
+                print(f"Invalid move: {e}")
                 list_legal_moves = list(chess_board.legal_moves)
                 rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
                 client.bots.make_move(game_id, rand_move.uci())
                 chess_board.push(rand_move)
-        return
+                print('Invalid move.. i moved random')
+                return
+
 
 def main():
     game_threads = []
@@ -256,7 +279,7 @@ def main():
                         game_thread.start()
                         print(f'Active Thread number: {threading.active_count()}')
                 print('Finish events loop')
-                time.sleep(1)
+                time.sleep(3)
                 return
         except berserk.exceptions.ResponseError as e:
             print(f"Rate limit exceeded: {e}. Waiting before retrying...")
