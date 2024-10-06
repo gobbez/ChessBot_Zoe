@@ -70,50 +70,70 @@ def evaluate_position_cp(fen):
 
 def stockfish_best_move(fen, opponent_elo):
     """
-    Stockfish analyze position and finds best move with the thinking times based on opponent_elo
+    Stockfish analyzes position and finds the best move with the thinking time and strength level based on opponent_elo
     :param fen: fen position
     :param opponent_elo: elo of opponent
     :return: best move for that thinking time
     """
     global STOCKFISH_PATH
-    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
-        # Set the board position
-        board = chess.Board(fen)
 
-        def get_deep_time():
-            # Get the best move
-            if opponent_elo <= 700:
-                deep_time = 0.2
-            elif opponent_elo <= 1000:
-                deep_time = 0.5
-            elif opponent_elo <= 1500:
-                deep_time = 1.0
-            elif opponent_elo <= 2000:
-                deep_time = 1.5
-            elif opponent_elo <= 2300:
-                deep_time = 2.3
-            elif opponent_elo <= 2500:
-                deep_time = 5.0
-            else:
-                deep_time = 10.0
-            return deep_time
-
-        # Evaluate position CP to determine how bot is playing (the worse, the more thinking time)
-        cp = evaluate_position_cp(fen)
-        if cp > 0:
-            deep_time = get_deep_time()
-        elif -50 < cp <= 0:
-            deep_time = get_deep_time() * 1.1
-        elif -100 < cp <= 50:
-            deep_time = get_deep_time() * 1.4
-        elif -200 < cp <= -100:
-            deep_time = get_deep_time() * 2
-        elif -400 < cp <= -200:
-            deep_time = get_deep_time() * 4
-        elif cp < -400:
-            deep_time = get_deep_time() * 7
+    def get_level_time():
+        # Get the best move
+        if opponent_elo <= 700:
+            deep_time = 0.2
+            skill_level = 2
+        elif opponent_elo <= 1000:
+            deep_time = 0.5
+            skill_level = 4
+        elif opponent_elo <= 1500:
+            deep_time = 1.0
+            skill_level = 9
+        elif opponent_elo <= 2000:
+            deep_time = 1.5
+            skill_level = 14
+        elif opponent_elo <= 2300:
+            deep_time = 2.3
+            skill_level = 16
+        elif opponent_elo <= 2500:
+            deep_time = 5.0
+            skill_level = 18
         else:
-            deep_time = get_deep_time()
+            deep_time = 10.0
+            skill_level = 20
+        return deep_time, skill_level
+
+    # Set the board position
+    board = chess.Board(fen)
+
+    # Evaluate position CP to determine how the bot is playing (the worse, the more thinking time)
+    cp = evaluate_position_cp(fen)
+    deep_time, skill_level = get_level_time()
+
+    if cp > 0:
+        pass
+    elif -50 < cp <= 0:
+        deep_time *= 1.1
+        skill_level += 1
+    elif -100 < cp <= 50:
+        deep_time *= 1.4
+        skill_level += 2
+    elif -200 < cp <= -100:
+        deep_time *= 2
+        skill_level += 3
+    elif -400 < cp <= -200:
+        deep_time *= 4
+        skill_level += 5
+    elif cp < -400:
+        deep_time *= 7
+        skill_level = 20
+
+    if skill_level < 1:
+        skill_level = 1
+    elif skill_level > 20:
+        skill_level = 20
+
+    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+        engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time))
         return result.move
 
@@ -236,7 +256,7 @@ def main():
                         game_thread.start()
                         print(f'Active Thread number: {threading.active_count()}')
                 print('Finish events loop')
-                time.sleep(5)
+                time.sleep(1)
                 return
         except berserk.exceptions.ResponseError as e:
             print(f"Rate limit exceeded: {e}. Waiting before retrying...")
@@ -250,7 +270,7 @@ def main():
         handle_events()
         # Clean up finished game threads
         game_threads = [thread for thread in game_threads if thread.is_alive()]
-        time.sleep(5)  # Adjust the sleep time as needed
+        time.sleep(10)  # Adjust the sleep time as needed
         main()
 
 if __name__ == "__main__":
