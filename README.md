@@ -1,6 +1,6 @@
 
 # ChessBot_Zoe
-High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking time based on opponent Elo and position evaluation.
+High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
 Human Opening Books to start as an human (work in progress)
 Ollama chatbot to interact with users (work in progress)
 
@@ -12,10 +12,10 @@ Ollama chatbot to interact with users (work in progress)
     <td>
       <h1>Main Features</h1>
       <ul>
-        <li>Stockfish 17 with various thinking time based on opponent Elo and position</li>
+        <li>Stockfish 17 that change its thinking time and strength level based on the opponent Elo and position</li>
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>
         <li>Bot can play multiple games and you can configure bullet too (as of now it's more into blitz or longer)</li>
-        <li>You can configure Stockfish thinking time or implement other chess logics</li>
+        <li>You can configure Stockfish thinking time, level or implement other chess logics</li>
         <li>Ollama model to chat, interact and even teach user in the game (work in progress)</li>
       </ul>
     </td>
@@ -26,11 +26,12 @@ Ollama chatbot to interact with users (work in progress)
 ## Info
 This Chess Bot will have different styles. 
 
-### Stockfish 17 with various thinking time
-Vary its reasoning time based on opponent elo and how good or bad its position is.
+### Stockfish 17 with various levels
+Vary its reasoning time and strength level based on opponent elo and how good or bad its position is.
 Stockfish can respond in less than 1 second with a pretty good move, but the more time allowed the deeper the analysis.
 
 Before moving, Stockfish will also analyze the position to determine how much more time it needs to spend (aka, the worse its position the more time it will use).
+It will also change its strength level to try to stay calibrated towards the opponent level.
 
 
 ### Personalized Opening Repertories
@@ -38,12 +39,12 @@ Before moving, Stockfish will also analyze the position to determine how much mo
 Bot can follow certain lines of your choose (if you program them) in order to use Stockfish only later in the game.
 This can sharp its playing speed (even if Stockfish can answer in less than 1 second too).
 
-Please note that most of the "waiting time" is due to avoid too many Lichess API calls (for now it's 30/40 seconds between moves)
+Please note that most of the "waiting time" is due to avoid too many Lichess API calls (for now it's 10/20 seconds between moves)
 
 
 ### Play any time
 
-Bot can play every time, but for now only blitz or longer are accepted.
+Bot can play every time, but for now only rapid or longer are accepted.
 
 
 ### Ollama Model to Chat, Interact and Teach Users (work in progress!)
@@ -69,7 +70,7 @@ Please note that these times can become a lot more longer in a real game in a co
   </tr>
   <tr>
     <td>1 / 15 sec</td>
-    <td>20 / 30 sec</td>
+    <td>10 / 20 sec</td>
     <td>20 / 30 sec</td>
   </tr>
 </table>
@@ -78,7 +79,7 @@ Please note that these times can become a lot more longer in a real game in a co
 
 #### Current version
 
-For now it uses Stockfish with different analysis times in base of the opponent Elo and position evaluation.
+For now it uses Stockfish with different analysis times and strength level in base of the opponent Elo and position evaluation.
 I'm working on adding some specific opening Repertories and Ollama for chat with the user
 
 Working to make it improve!
