@@ -1,4 +1,5 @@
 import berserk
+import asyncio
 import yaml
 import chess
 import chess.engine
@@ -8,6 +9,13 @@ import threading
 import time
 from pathlib import Path
 import ollama
+import sys
+
+import run_telegram_bot
+
+
+# Avoid max recursion limit
+sys.setrecursionlimit(100000)
 
 # Load Stockfish
 THIS_FOLDER = Path(__file__).parent.resolve()
@@ -29,6 +37,37 @@ with open(config_path, 'r') as config_file:
 # Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
+
+# Configure Telegram bot with token
+telegram_token = config['tg_token']
+
+
+# Global shared (between Lichess and Telegram Bots) functions
+def load_global_db(search_for='', game_for='', action='', add_value=0):
+    """
+    This csv file will be shared between Lichess and Telegram Bots to set params
+    Load the param(s) you are setting
+    :param search_for: str to tell what column to access
+    :param game_for: value to access if a particular opponent or game to set params
+    :param action: set or get
+    :param add_value: value to be set
+    :return: DataFrame to access modified params
+    """
+    # Set level from Telegram db
+    level_csv = THIS_FOLDER / "database/Stockfish_level.csv"
+    df_level = pd.read_csv(level_csv)
+    if action == 'get':
+        set_level = None
+        if game_for == 'global':
+            df_level = df_level[df_level['Game'] == 'global']
+            if search_for == 'level' and len(df_level) == 1:
+                set_level = df_level['Level'][0]
+                return set_level
+    elif action == 'set':
+        if game_for == 'global':
+            df_level.loc[df_level['Game'] == 'global', 'Level'] = add_value
+            df_level.to_csv(level_csv)
+
 
 
 # OLLAMA CHAT
@@ -68,7 +107,7 @@ def evaluate_position_cp(fen):
         return cp
 
 
-def stockfish_best_move(fen, opponent_elo):
+def stockfish_best_move(fen, opponent_elo, opponent_name):
     """
     Stockfish analyzes position and finds the best move with the thinking time and strength level based on opponent_elo
     :param fen: fen position
@@ -110,20 +149,11 @@ def stockfish_best_move(fen, opponent_elo):
     deep_time, skill_level = get_level_time()
 
     if cp > 800:
-        pass
-    elif 600 < cp <= 800:
-        deep_time *= 0.1
-        skill_level -= 10
+        skill_level = 20
     elif 400 < cp <= 600:
-        deep_time *= 0.2
-        skill_level -= 8
-    elif 300 < cp <= 400:
-        deep_time *= 0.4
-        skill_level -= 6
-    elif 200 < cp <= 300:
-        deep_time *= 0.6
+        deep_time *= 0.5
         skill_level -= 4
-    elif 100 < cp <= 200:
+    elif 100 < cp <= 400:
         deep_time *= 0.7
         skill_level -= 3
     elif 50 < cp <= 100:
@@ -155,6 +185,25 @@ def stockfish_best_move(fen, opponent_elo):
     elif skill_level > 20:
         skill_level = 20
 
+    # Check if a shared global var is setted (to modify level from Telegram Bot)
+    set_level = load_global_db('level', 'global', 'get', 0)
+    if set_level == 0 or set_level is None:
+        # Not setted
+        pass
+    elif set_level < 0:
+        skill_level = 1
+    elif set_level > 20:
+        skill_level = 20
+    else:
+        skill_level = set_level
+
+    # Send message to Telegram Bot
+    send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
+                    f"CP evaluation: {cp // 100}\n"
+                    f"Playing at level: {skill_level}\n"
+                    f"Thinking time: {deep_time}s")
+    run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
+
     with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
         engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time))
@@ -177,7 +226,7 @@ def read_opening_book(fen):
         return move
 
 
-def handle_game_bot_turn(game_id, fen, elo_opponent):
+def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     """
     This function handles the moves on Lichess and saves moves.
     :param game_id: the game id that the bot is currently playing
@@ -232,7 +281,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent):
                     chess_board.push_uci(next_move)
                 else:
                     # Use Stockfish 17 to find best move
-                    next_move = stockfish_best_move(fen, elo_opponent)
+                    next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
                     client.bots.make_move(game_id, next_move.uci())
                     chess_board.push(next_move)
                     print('I moved')
@@ -256,9 +305,12 @@ def main():
             for event in events:
                 print(event['type'])
                 if event['type'] == 'challenge':
-                    if event['challenge']['speed'] in ['rapid', 'standard']:
-                        # Accepting only rapid or standard games for now (both rated and not)
+                    if event['challenge']['speed'] in ['standard', 'correspondence']:
+                        # Accepting only rapid, standard and correspondence games for now (both rated and not)
                         print('Challenge accepted!')
+                        # Send message to Telegram Bot
+                        send_message = f"Accepted challenge {event}"
+                        run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
                         challenge_id = event['challenge']['id']
                         client.bots.accept_challenge(challenge_id)
 
@@ -273,8 +325,9 @@ def main():
                             client.bots.post_message(game_id, ai_send_message, False)
                         fen = event['game']['fen']
                         elo_opponent = event['game']['opponent']['rating']
+                        opponent_name = event['game']['opponent']['username']
                         print('My turn')
-                        game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id, fen, elo_opponent))
+                        game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id, fen, elo_opponent, opponent_name))
                         game_threads.append(game_thread)
                         game_thread.start()
                         print(f'Active Thread number: {threading.active_count()}')
@@ -293,8 +346,12 @@ def main():
         handle_events()
         # Clean up finished game threads
         game_threads = [thread for thread in game_threads if thread.is_alive()]
-        time.sleep(10)  # Adjust the sleep time as needed
+        time.sleep(15)  # Adjust the sleep time as needed
         main()
+
 
 if __name__ == "__main__":
     main()
+
+
+

@@ -1,6 +1,7 @@
 
 # ChessBot_Zoe
 High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
+Telegram Bot to access Lichess Bot results real time!
 Human Opening Books to start as an human (work in progress)
 Ollama chatbot to interact with users (work in progress)
 
@@ -14,7 +15,8 @@ Ollama chatbot to interact with users (work in progress)
       <ul>
         <li>Stockfish 17 that change its thinking time and strength level based on the opponent Elo and position</li>
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>
-        <li>Bot can play multiple games and you can configure bullet too (as of now it's more into blitz or longer)</li>
+        <li>Configure a Telegram Bot to access Lichess Bot games and results.. real time!</li>
+        <li>Bot can play multiple games and you can configure bullet too (as of now it's more into rapid or longer)</li>
         <li>You can configure Stockfish thinking time, level or implement other chess logics</li>
         <li>Ollama model to chat, interact and even teach user in the game (work in progress)</li>
       </ul>
@@ -53,12 +55,17 @@ The Bot will be powered by Ollama models (maybe Gemma2b:2) to chat with the user
 Nope, even if it wants to teach you, it wants to win at all costs too!
 
 
+### Telegram Bot to access Lichess Bot results LIVE
+
+You can create a Telegram Bot to comunicate with the Lichess Bot and exchange informations. You can set Stockfish level via Telegram, too!
+
+
 #### Performances
 Here are the performances (aka time to execute that part of code):
 Stockfish is the time used by Stockfish to answer, Wait time is the time wait to prevent too many Lichess API calls.
 These can be configured in the code.
 
-Performances are done searching a starting position with my pc: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz - 16 Gb Ram.
+Performances are done on my pc: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz - 16 Gb Ram.
 
 Please note that these times can become a lot more longer in a real game in a complicated (or rare) position when the bot is online.
 

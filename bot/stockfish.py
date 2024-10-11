@@ -50,9 +50,10 @@ def stockfish_best_move(fen, opponent_elo):
         else:
             deep_time = get_deep_time()
 
+        skill_level = 20
+        engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time))
         return result.move
-
 
 def evaluate_position_cp(fen):
     """
@@ -67,6 +68,8 @@ def evaluate_position_cp(fen):
         cp = str(info['score'].relative)
         cp = int(cp)
         return cp
+
+
 
 
 def adapt_power(fen, opponent_elo):
@@ -117,4 +120,4 @@ def adapt_power(fen, opponent_elo):
 
 
 fen = "rnbqk1n1/ppp2p2/3b2p1/3pp1N1/4P3/8/PPPP1PP1/RNB1KB1R b Qq - 1 7"
-print(evaluate_position_cp(fen))
+print(stockfish_best_move(fen, 2000))
