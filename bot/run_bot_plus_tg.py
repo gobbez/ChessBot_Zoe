@@ -47,26 +47,32 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
     This csv file will be shared between Lichess and Telegram Bots to set params
     Load the param(s) you are setting
-    :param search_for: str to tell what column to access
+    :param search_for: str to tell what column to access (Level or Think)
     :param game_for: value to access if a particular opponent or game to set params
     :param action: set or get
     :param add_value: value to be set
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    level_csv = THIS_FOLDER / "database/Stockfish_level.csv"
+    level_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
     df_level = pd.read_csv(level_csv)
     if action == 'get':
-        set_level = None
         if game_for == 'global':
             df_level = df_level[df_level['Game'] == 'global']
             if search_for == 'level' and len(df_level) == 1:
                 set_level = df_level['Level'][0]
                 return set_level
+            elif search_for == 'think' and len(df_level) == 1:
+                set_think = df_level['Think'][0]
+                return set_think
     elif action == 'set':
         if game_for == 'global':
-            df_level.loc[df_level['Game'] == 'global', 'Level'] = add_value
-            df_level.to_csv(level_csv)
+            if search_for == 'level':
+                df_level.loc[df_level['Game'] == game_for, 'Level'] = add_value
+                df_level.to_csv(level_csv)
+            if search_for == 'think':
+                df_level.loc[df_level['Game'] == game_for, 'Think'] = add_value
+                df_level.to_csv(level_csv)
 
 
 
@@ -185,9 +191,9 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     elif skill_level > 20:
         skill_level = 20
 
-    # Check if a shared global var is setted (to modify level from Telegram Bot)
+    # Check if a shared global var Level is setted (to modify level from Telegram Bot)
     set_level = load_global_db('level', 'global', 'get', 0)
-    if set_level == 0 or set_level is None:
+    if set_level <= 0 or set_level is None:
         # Not setted
         pass
     elif set_level < 0:
@@ -196,6 +202,16 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         skill_level = 20
     else:
         skill_level = set_level
+
+    # Check if shared global var Think is setted (to modify thinking time from Telegram Bot)
+    set_think = load_global_db('think', 'global', 'get', 0)
+    if set_think <= 0 or set_think is None:
+        # Not setted
+        pass
+    elif set_think >= 3600:
+        deep_time = 3600
+    else:
+        deep_time = set_think
 
     # Send message to Telegram Bot
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"

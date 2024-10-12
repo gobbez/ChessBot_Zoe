@@ -24,26 +24,32 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
     This csv file will be shared between Lichess and Telegram Bots to set params
     Load the param(s) you are setting
-    :param search_for: str to tell what column to access
+    :param search_for: str to tell what column to access (Level or Think)
     :param game_for: value to access if a particular opponent or game to set params
     :param action: set or get
     :param add_value: value to be set
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    level_csv = THIS_FOLDER / "database/Stockfish_level.csv"
+    level_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
     df_level = pd.read_csv(level_csv)
     if action == 'get':
-        set_level = None
         if game_for == 'global':
             df_level = df_level[df_level['Game'] == 'global']
             if search_for == 'level' and len(df_level) == 1:
                 set_level = df_level['Level'][0]
                 return set_level
+            elif search_for == 'think' and len(df_level) == 1:
+                set_think = df_level['Think'][0]
+                return set_think
     elif action == 'set':
         if game_for == 'global':
-            df_level.loc[df_level['Game'] == 'global', 'Level'] = add_value
-            df_level.to_csv(level_csv)
+            if search_for == 'level':
+                df_level.loc[df_level['Game'] == game_for, 'Level'] = add_value
+                df_level.to_csv(level_csv)
+            if search_for == 'think':
+                df_level.loc[df_level['Game'] == game_for, 'Think'] = add_value
+                df_level.to_csv(level_csv)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -87,7 +93,7 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_received = update.message.text
     try:
         if user.id == telegram_myid:
-            # Search comand
+            # Set Level
             if text_received.startswith('set_level'):
                 if text_received[-2].startswith('0'):
                     set_value = int(text_received[-1])
@@ -97,6 +103,12 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     load_global_db('level', 'global', 'set', set_value)
                 value_setted = load_global_db('level', 'global', 'get', 0)
                 await update.message.reply_text(f"Level setted: {value_setted}")
+            # Set Thinking Time
+            elif text_received.startswith('set_thinking'):
+                set_think = int(text_received[12:])
+                load_global_db('think', 'global', 'set', set_think)
+                value_setted = load_global_db('think', 'global', 'get', 0)
+                await update.message.reply_text(f"Thinking setted: {value_setted}s")
     except:
         await update.message.reply_text("Wrong value for level")
 
