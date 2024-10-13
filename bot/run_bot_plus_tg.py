@@ -49,32 +49,38 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
     This csv file will be shared between Lichess and Telegram Bots to set params
     Load the param(s) you are setting
-    :param search_for: str to tell what column to access (Level or Think)
+    :param search_for: str to tell what column to access (Level, Think or Wait_Api)
     :param game_for: value to access if a particular opponent or game to set params
     :param action: set or get
     :param add_value: value to be set
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    level_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
-    df_level = pd.read_csv(level_csv)
+    global_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
+    df_global = pd.read_csv(global_csv)
     if action == 'get':
         if game_for == 'global':
-            df_level = df_level[df_level['Game'] == 'global']
-            if search_for == 'level' and len(df_level) == 1:
-                set_level = df_level['Level'][0]
+            df_global = df_global[df_global['Game'] == game_for]
+            if search_for == 'level' and len(df_global) == 1:
+                set_level = df_global['Level'][0]
                 return set_level
-            elif search_for == 'think' and len(df_level) == 1:
-                set_think = df_level['Think'][0]
+            elif search_for == 'think' and len(df_global) == 1:
+                set_think = df_global['Think'][0]
                 return set_think
+            elif search_for == 'wait_api' and len(df_global) == 1:
+                set_wait = df_global['Wait_Api'][0]
+                return set_wait
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
-                df_level.loc[df_level['Game'] == game_for, 'Level'] = add_value
-                df_level.to_csv(level_csv)
-            if search_for == 'think':
-                df_level.loc[df_level['Game'] == game_for, 'Think'] = add_value
-                df_level.to_csv(level_csv)
+                df_global.loc[df_global['Game'] == game_for, 'Level'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'think':
+                df_global.loc[df_global['Game'] == game_for, 'Think'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'wait_api':
+                df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
+                df_global.to_csv(global_csv)
 
 
 
@@ -359,7 +365,18 @@ def main():
                             game_thread.start()
                             print(f'Active Thread number: {threading.active_count()}')
                     print('Finish events loop')
-                    time.sleep(3)
+                    # Get wait time
+                    set_wait = load_global_db('wait_api', 'global', 'get', 0)
+                    set_wait = set_wait / 5
+                    if set_wait < 0:
+                        print('waiting 3s')
+                        time.sleep(3)
+                    elif set_wait > 180:
+                        print('waiting 180s')
+                        time.sleep(180)
+                    else:
+                        print(f'waiting {set_wait}s')
+                        time.sleep(set_wait)
                     return
             except berserk.exceptions.ResponseError as e:
                 print(f"Rate limit exceeded: {e}. Waiting before retrying...")
@@ -373,7 +390,17 @@ def main():
             handle_events()
             # Clean up finished game threads
             game_threads = [thread for thread in game_threads if thread.is_alive()]
-            time.sleep(15)  # Adjust the sleep time as needed
+            # Get wait time
+            set_wait = load_global_db('wait_api', 'global', 'get', 0)
+            if set_wait < 0:
+                print('waiting 15s')
+                time.sleep(15)
+            elif set_wait > 180:
+                print('waiting 180s')
+                time.sleep(180)
+            else:
+                print(f'waiting {set_wait}s')
+                time.sleep(set_wait)
             main()
 
 
