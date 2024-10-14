@@ -128,10 +128,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     :param opponent_elo: elo of opponent
     :return: best move for that thinking time
     """
-    global STOCKFISH_PATH, bot_thinking
-
-    # Set bot_thinking to 1 in order to stop While iteration
-    bot_thinking = 1
+    global STOCKFISH_PATH
 
     def get_level_time():
         # Get the best move
@@ -235,8 +232,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time))
 
-    # Set bot_thinking to 0 so that While iteration can continue
-    bot_thinking = 0
     return result.move
 
 
@@ -263,6 +258,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     :param fen: the fen position, to pass to read_fen_database to extract move
     :param elo_opponent: opponent Lichess elo
     """
+    global bot_thinking
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
 
@@ -315,6 +311,8 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                     client.bots.make_move(game_id, next_move.uci())
                     chess_board.push(next_move)
                     print('I moved')
+                    # Set bot_thinking to 0 so that While iteration can continue
+                    bot_thinking = 0
                 return
             except Exception as e:
                 print(f"Invalid move: {e}")
@@ -326,86 +324,80 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 return
 
 
-def main():
+def handle_events():
     global bot_thinking
     game_threads = []
-
-    # Process only if Stockfish isn't thinking a move
-    if bot_thinking == 0:
-        def handle_events():
-            try:
+    try:
+        while True:
+            # Process only if Stockfish isn't thinking a move
+            if bot_thinking == 0:
+                print('While..')
+                counter = 0
                 events = client.bots.stream_incoming_events()
                 for event in events:
-                    print(event['type'])
-                    if event['type'] == 'challenge':
-                        if event['challenge']['speed'] in ['standard', 'correspondence']:
-                            # Accepting only rapid, standard and correspondence games for now (both rated and not)
-                            print('Challenge accepted!')
-                            # Send message to Telegram Bot
-                            send_message = f"Accepted challenge {event}"
-                            run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
-                            challenge_id = event['challenge']['id']
-                            client.bots.accept_challenge(challenge_id)
+                    counter += 1
+                    if counter < 22:
+                        print(event['game']['opponent'])
+                        if event['type'] == 'challenge':
+                            if event['challenge']['speed'] in ['standard', 'correspondence']:
+                                # Accepting only rapid, standard and correspondence games for now (both rated and not)
+                                print('Challenge accepted!')
+                                # Send message to Telegram Bot
+                                send_message = f"Accepted challenge {event}"
+                                run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
+                                challenge_id = event['challenge']['id']
+                                client.bots.accept_challenge(challenge_id)
 
-                    elif event['type'] == 'gameStart':
-                        board_event = event['game']
-                        game_id = event['game']['id']
-                        # Check if it's Bot Turn and if id is not in thread_list (prevent multiple threads on same game)
-                        if board_event['isMyTurn']:
-                            if game_id not in list_playing_id:
-                                list_playing_id.append(game_id)
-                                ai_send_message = ollama_stream_message()
-                                client.bots.post_message(game_id, ai_send_message, False)
-                            fen = event['game']['fen']
-                            elo_opponent = event['game']['opponent']['rating']
-                            opponent_name = event['game']['opponent']['username']
-                            print('My turn')
-                            game_thread = threading.Thread(target=handle_game_bot_turn, args=(game_id, fen, elo_opponent, opponent_name))
-                            game_threads.append(game_thread)
-                            game_thread.start()
-                            print(f'Active Thread number: {threading.active_count()}')
-                    print('Finish events loop')
-                    # Get wait time
-                    set_wait = load_global_db('wait_api', 'global', 'get', 0)
-                    set_wait = set_wait / 5
-                    if set_wait < 0:
-                        print('waiting 3s')
-                        time.sleep(3)
-                    elif set_wait > 180:
-                        print('waiting 180s')
-                        time.sleep(180)
+                        elif event['type'] == 'gameStart':
+                            board_event = event['game']
+                            game_id = event['game']['id']
+                            # Check if it's Bot Turn and if id is not in thread_list (prevent multiple threads on same game)
+                            if board_event['isMyTurn']:
+                                # Set bot_thinking to 1 in order to stop While iteration
+                                bot_thinking = 1
+                                if game_id not in list_playing_id:
+                                    list_playing_id.append(game_id)
+                                    ai_send_message = ollama_stream_message()
+                                    client.bots.post_message(game_id, ai_send_message, False)
+                                fen = event['game']['fen']
+                                elo_opponent = event['game']['opponent']['rating']
+                                opponent_name = event['game']['opponent']['username']
+                                print('My turn')
+                                game_thread = threading.Thread(target=handle_game_bot_turn,
+                                                               args=(game_id, fen, elo_opponent, opponent_name))
+                                game_threads.append(game_thread)
+                                game_thread.start()
+                                print(f'Active Thread number: {threading.active_count()}')
                     else:
-                        print(f'waiting {set_wait}s')
-                        time.sleep(set_wait)
-                    return
-            except berserk.exceptions.ResponseError as e:
-                print(f"Rate limit exceeded: {e}. Waiting before retrying...")
-                time.sleep(90)  # Wait for 90 seconds before retrying
-            except Exception as e:
-                print(f"Unexpected error: {e}")
-                time.sleep(10)  # Wait for 10 seconds before retrying
+                        # Clean up finished game threads
+                        game_threads = [thread for thread in game_threads if thread.is_alive()]
+                        # Get wait time
+                        set_wait = load_global_db('wait_api', 'global', 'get', 0)
+                        if set_wait < 0:
+                            print('waiting 15s')
+                            time.sleep(15)
+                        elif set_wait > 180:
+                            print('waiting 180s')
+                            time.sleep(180)
+                        else:
+                            print(f'waiting {set_wait}s')
+                            time.sleep(set_wait)
+                        # Returns to While
+                        counter = 0
+                        break
 
-        while True:
-            print('While..')
-            handle_events()
-            # Clean up finished game threads
-            game_threads = [thread for thread in game_threads if thread.is_alive()]
-            # Get wait time
-            set_wait = load_global_db('wait_api', 'global', 'get', 0)
-            if set_wait < 0:
-                print('waiting 15s')
-                time.sleep(15)
-            elif set_wait > 180:
-                print('waiting 180s')
-                time.sleep(180)
-            else:
-                print(f'waiting {set_wait}s')
-                time.sleep(set_wait)
-            main()
+    except berserk.exceptions.ResponseError as e:
+        print(f"Rate limit exceeded: {e}. Waiting before retrying...")
+        time.sleep(90)  # Wait for 90 seconds before retrying
+        handle_events()  # Restart the event handling after the wait
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        time.sleep(10)  # Wait for 10 seconds before retrying
+        handle_events()  # Restart the event handling after the wait
 
 
 if __name__ == "__main__":
-    main()
+    handle_events()
 
 
 
