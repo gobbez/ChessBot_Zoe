@@ -333,10 +333,16 @@ def handle_events():
             if bot_thinking == 0:
                 print('While..')
                 counter = 0
+
+                # Get number of active games
+                ongoing_games = client.games.get_ongoing()
+                active_games = [game for game in ongoing_games]
+                active_games_count = len(active_games)
+
                 events = client.bots.stream_incoming_events()
                 for event in events:
                     counter += 1
-                    if counter < 22:
+                    if counter < active_games_count:
                         print(event['game']['opponent'])
                         if event['type'] == 'challenge':
                             if event['challenge']['speed'] in ['standard', 'correspondence']:
