@@ -1,6 +1,6 @@
 
 # ChessBot_Zoe
-High Performing - Lichess Bot powered by Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
+High Performing - Lichess Bot powered by Lichess Human Databases and Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
 Telegram Bot to access Lichess Bot results real time!
 Human Opening Books to start as an human (work in progress)
 Ollama chatbot to interact with users (work in progress)
@@ -14,6 +14,7 @@ Ollama chatbot to interact with users (work in progress)
       <h1>Main Features</h1>
       <ul>
         <li>Stockfish 17 that change its thinking time and strength level based on the opponent Elo and position</li>
+        <li>Lichess users database to find the most played move by humans and communicate in chat the avg_elo and number of times each move is played</li>
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>
         <li>Configure a Telegram Bot to access Lichess Bot games and results.. real time!</li>
         <li>Bot can play multiple games and you can configure bullet too (as of now it's more into rapid or longer)</li>
@@ -29,11 +30,18 @@ Ollama chatbot to interact with users (work in progress)
 This Chess Bot will have different styles. 
 
 ### Stockfish 17 with various levels
-Vary its reasoning time and strength level based on opponent elo and how good or bad its position is.
+Vary its parameters based on opponent elo and how good or bad its position is.
 Stockfish can respond in less than 1 second with a pretty good move, but the more time allowed the deeper the analysis.
 
 Before moving, Stockfish will also analyze the position to determine how much more time it needs to spend (aka, the worse its position the more time it will use).
 It will also change its strength level to try to stay calibrated towards the opponent level.
+
+You can change Stockfish parameters via Telegram Bot too!
+
+
+### Lichess Human Moves
+For each move, after searching for its Opening Repertories (work in progress), it searches on Lichess Database to find the most played move by human users.
+It will also tell you in the chat how many times that move was played and the average Elo of users playing it!
 
 
 ### Personalized Opening Repertories
@@ -72,11 +80,13 @@ Please note that these times can become a lot more longer in a real game in a co
 <table>
   <tr>
     <th>Stockfish</th>
+    <th>Lichess Human moves</th>
     <th>Move wait time</th>
     <th>Ollama chat</th>
   </tr>
   <tr>
     <td>1 / 15 sec</td>
+    <td>5 / 10 sec</td>
     <td>10 / 20 sec</td>
     <td>20 / 30 sec</td>
   </tr>

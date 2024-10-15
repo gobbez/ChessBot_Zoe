@@ -37,11 +37,15 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
         if game_for == 'global':
             df_global = df_global[df_global['Game'] == game_for]
             if search_for == 'level' and len(df_global) == 1:
-                set_level = df_global['Level'][0]
-                return set_level
+                return df_global['Level'][0]
             elif search_for == 'think' and len(df_global) == 1:
-                set_think = df_global['Think'][0]
-                return set_think
+                return df_global['Think'][0]
+            elif search_for == 'hash' and len(df_global) == 1:
+                return df_global['Hash'][0]
+            elif search_for == 'depth' and len(df_global) == 1:
+                return df_global['Depth'][0]
+            elif search_for == 'thread' and len(df_global) == 1:
+                return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
                 set_wait = df_global['Wait_Api'][0]
                 return set_wait
@@ -52,6 +56,15 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 df_global.to_csv(global_csv)
             elif search_for == 'think':
                 df_global.loc[df_global['Game'] == game_for, 'Think'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'hash':
+                df_global.loc[df_global['Game'] == game_for, 'Hash'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'depth':
+                df_global.loc[df_global['Game'] == game_for, 'Depth'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'thread':
+                df_global.loc[df_global['Game'] == game_for, 'Thread'] = add_value
                 df_global.to_csv(global_csv)
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
@@ -124,6 +137,24 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 load_global_db('think', 'global', 'set', set_think)
                 value_setted = load_global_db('think', 'global', 'get', 0)
                 await update.message.reply_text(f"Thinking setted: {value_setted}s")
+            # Set Hash Memory
+            elif text_received.startswith('set_hash'):
+                set_hash = int(text_received[8:])
+                load_global_db('hash', 'global', 'set', set_hash)
+                value_setted = load_global_db('hash', 'global', 'get', 0)
+                await update.message.reply_text(f"Hash Memory setted: {value_setted}s")
+            # Set Depth Moves
+            elif text_received.startswith('set_depth'):
+                set_depth = int(text_received[9:])
+                load_global_db('depth', 'global', 'set', set_depth)
+                value_setted = load_global_db('depth', 'global', 'get', 0)
+                await update.message.reply_text(f"Depth moves setted: {value_setted}s")
+            # Set Threads Number
+            elif text_received.startswith('set_thread'):
+                set_thread = int(text_received[10:])
+                load_global_db('thread', 'global', 'set', set_thread)
+                value_setted = load_global_db('thread', 'global', 'get', 0)
+                await update.message.reply_text(f"Threads number setted: {value_setted}s")
             # Set Api Waiting Time (time.sleep)
             elif text_received.startswith('set_wait_api'):
                 set_wait = int(text_received[12:])
@@ -131,7 +162,7 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 value_setted = load_global_db('wait_api', 'global', 'get', 0)
                 await update.message.reply_text(f"Wait Api setted: {value_setted}s")
     except:
-        await update.message.reply_text("Wrong value for level")
+        await update.message.reply_text("Wrong value for setting..")
 
 
 def send_message_to_telegram(telegram_token, message):

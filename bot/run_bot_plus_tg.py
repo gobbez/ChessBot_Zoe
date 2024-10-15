@@ -10,6 +10,9 @@ import time
 from pathlib import Path
 import ollama
 import sys
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 import run_telegram_bot
 
@@ -62,11 +65,15 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
         if game_for == 'global':
             df_global = df_global[df_global['Game'] == game_for]
             if search_for == 'level' and len(df_global) == 1:
-                set_level = df_global['Level'][0]
-                return set_level
+                return df_global['Level'][0]
             elif search_for == 'think' and len(df_global) == 1:
-                set_think = df_global['Think'][0]
-                return set_think
+                return df_global['Think'][0]
+            elif search_for == 'hash' and len(df_global) == 1:
+                return df_global['Hash'][0]
+            elif search_for == 'depth' and len(df_global) == 1:
+                return df_global['Depth'][0]
+            elif search_for == 'thread' and len(df_global) == 1:
+                return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
                 set_wait = df_global['Wait_Api'][0]
                 return set_wait
@@ -78,14 +85,71 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'think':
                 df_global.loc[df_global['Game'] == game_for, 'Think'] = add_value
                 df_global.to_csv(global_csv)
+            elif search_for == 'hash':
+                df_global.loc[df_global['Game'] == game_for, 'Hash'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'depth':
+                df_global.loc[df_global['Game'] == game_for, 'Depth'] = add_value
+                df_global.to_csv(global_csv)
+            elif search_for == 'thread':
+                df_global.loc[df_global['Game'] == game_for, 'Thread'] = add_value
+                df_global.to_csv(global_csv)
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
 
 
+# Lichess Analysis Move
+def lichess_analysis_move(fen):
+    """
+    Connects to Lichess Analysis Board, filters for >2500 Lichess users and play the most played move
+    :param fen: fen position
+    :param moves: list of moves played
+    :return: the most played move (if any), number of times that move is played, avg_rating of played moves
+    """
+    # Set up Chrome options for headless browsing
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    # Initialize the driver with the specified options
+    driver = webdriver.Chrome(options=chrome_options)
+
+    # Go to Analysis Board
+    link = f'https://lichess.org/analysis/{fen}'
+    driver.get(link)
+    # Click on "book icon"
+    driver.find_element(By.CLASS_NAME, 'fbt').click()
+    # Click on Lichess players
+    time.sleep(1)
+    driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
+    # Open filter settings
+    driver.find_element(By.CLASS_NAME, 'toconf').click()
+    # Select only rapid and longer (de-select bullet and blitz)
+    driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
+    driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
+    # Select only >2200 elo
+    for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
+        driver.find_element(By.XPATH, f'//button[text()={i}]').click()
+    # Confirm
+    driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
+
+    # Find element <tr> with data-uci="move"
+    get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
+    # Find number playing
+    get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
+    # Find avg rating
+    avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
+    move = get_move.get_attribute('data-uci')
+    return move, get_num_played, avg_rating
+
 
 # OLLAMA CHAT
 def ollama_stream_message():
+    """
+    Ollama Gemma2:2b will read the prompt to write a messages
+    :return: AI message
+    """
     ai_prompt = ("You are Zoe, a Lichess chess Bot."
                  "Here's the list of your functions:"
                  "-Chess Books to follow human openings"
@@ -97,8 +161,10 @@ def ollama_stream_message():
         model='gemma2:2b',
         messages=[{'role': 'user', 'content': ai_prompt + intro_prompt}],
     )
-    print(stream['message']['content'])
-    return stream['message']['content']
+    ai_message = stream['message']['content']
+    # Get only first 140 characters of the message (Lichess chat is 140 chars max)
+    ai_message = ai_message[:141]
+    return ai_message
 
 
 # STOCKFISH FUNCTIONS
@@ -123,7 +189,7 @@ def evaluate_position_cp(fen):
 
 def stockfish_best_move(fen, opponent_elo, opponent_name):
     """
-    Stockfish analyzes position and finds the best move with the thinking time and strength level based on opponent_elo
+    Stockfish analyzes position and finds the best move with its parameters based on opponent_elo
     :param fen: fen position
     :param opponent_elo: elo of opponent
     :return: best move for that thinking time
@@ -131,48 +197,78 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     global STOCKFISH_PATH
 
     def get_level_time():
-        # Get the best move
+        # Set base level, thinking time, hash memory, move depth and threads_m
         if opponent_elo <= 700:
             deep_time = 0.2
             skill_level = 2
+            hash_m = 16
+            depth = 4
+            threads_m = 4
         elif opponent_elo <= 1000:
             deep_time = 0.5
             skill_level = 4
+            hash_m = 16
+            depth = 8
+            threads_m = 8
         elif opponent_elo <= 1500:
             deep_time = 1.0
             skill_level = 9
+            hash_m = 32
+            depth = 10
+            threads_m = 11
         elif opponent_elo <= 2000:
             deep_time = 1.5
             skill_level = 14
+            hash_m = 128
+            depth = 12
+            threads_m = 11
         elif opponent_elo <= 2300:
             deep_time = 2.3
             skill_level = 16
+            hash_m = 512
+            depth = 15
+            threads_m = 13
         elif opponent_elo <= 2500:
             deep_time = 5.0
             skill_level = 18
+            hash_m = 1028
+            depth = 20
+            threads_m = 15
         else:
             deep_time = 10.0
             skill_level = 20
-        return deep_time, skill_level
+            hash_m = 2056
+            depth = 25
+            threads_m = 18
+        return deep_time, skill_level, hash_m, depth, threads_m
 
     # Set the board position
     board = chess.Board(fen)
 
-    # Evaluate position CP to determine how the bot is playing (the worse, the more thinking time)
+    # Evaluate position CP to determine how the bot is playing (level, thinking time, hash memory, moves depth, threads)
     cp = evaluate_position_cp(fen)
-    deep_time, skill_level = get_level_time()
+    deep_time, skill_level, hash_m, depth, threads_m = get_level_time()
 
     if cp > 800:
         skill_level = 20
     elif 400 < cp <= 600:
         deep_time *= 0.5
         skill_level -= 4
+        hash_m *= 0.7
+        depth *= 0.6
+        threads_m *= 0.7
     elif 100 < cp <= 400:
         deep_time *= 0.7
         skill_level -= 3
+        hash_m *= 0.8
+        depth *= 0.8
+        threads_m *= 0.8
     elif 50 < cp <= 100:
         deep_time *= 0.8
         skill_level -= 2
+        hash_m *= 0.9
+        depth *= 0.9
+        threads_m *= 0.9
     elif 0 < cp <= 50:
         deep_time *= 0.9
         skill_level -= 1
@@ -184,15 +280,22 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     elif -100 < cp <= 50:
         deep_time *= 1.4
         skill_level += 2
+        hash_m = hash_m * 1.05 + 50
     elif -200 < cp <= -100:
         deep_time *= 2
         skill_level += 3
+        hash_m = hash_m * 1.1 + 100
+        threads_m *= 1.1
     elif -400 < cp <= -200:
         deep_time *= 4
         skill_level += 5
+        hash_m = hash_m * 1.3 + 200
+        threads_m *= 1.2
     elif cp < -400:
         deep_time *= 7
         skill_level = 20
+        hash_m = hash_m * 1.5 + 300
+        threads_m *= 1.4
 
     if skill_level < 1:
         skill_level = 1
@@ -221,16 +324,54 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     else:
         deep_time = set_think
 
+    # Check if shared global var Hash is setted (to modify hash memory from Telegram Bot)
+    set_hash = load_global_db('hash', 'global', 'get', 0)
+    if set_hash <= 0 or set_hash is None:
+        # Not setted
+        pass
+    elif set_hash >= 2100:
+        hash_m = 2100
+    else:
+        hash_m = set_hash
+
+    # Check if shared global var Depth is setted (to modify depth moves from Telegram Bot)
+    set_depth = load_global_db('depth', 'global', 'get', 0)
+    if set_depth <= 0 or set_depth is None:
+        # Not setted
+        pass
+    elif set_depth >= 30:
+        depth = 30
+    else:
+        depth = set_depth
+
+    # Check if shared global var Thread is setted (to modify threads from Telegram Bot)
+    set_thread = load_global_db('thread', 'global', 'get', 0)
+    if set_thread <= 0 or set_thread is None:
+        # Not setted
+        pass
+    elif set_thread >= 20:
+        threads_m = 20
+    else:
+        threads_m = set_thread
+
     # Send message to Telegram Bot
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
                     f"CP evaluation: {cp // 100}\n"
                     f"Playing at level: {skill_level}\n"
-                    f"Thinking time: {round(deep_time, 1)}s")
+                    f"Thinking time: {round(deep_time, 1)}s"
+                    f"Hash Memory: {round(hash_m)}Mb"
+                    f"Moves Depth: {round(depth)}"
+                    f"Threads Num: {round(threads_m)}")
     run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
 
     with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+        # Set hash size (in MB)
+        engine.configure({"Hash": hash_m})
+        # Set the number of threads
+        engine.configure({"Threads": threads_m})
+        # Set level
         engine.configure({"Skill Level": skill_level})
-        result = engine.play(board, chess.engine.Limit(time=deep_time))
+        result = engine.play(board, chess.engine.Limit(time=deep_time, depth=depth))
 
     return result.move
 
@@ -305,14 +446,34 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                     # Use the move from Opening Books file
                     client.bots.make_move(game_id, next_move)
                     chess_board.push_uci(next_move)
+                    print('I moved from Opening Book')
+                    send_message = f'My move is from a human Opening Repertoire'
+                    client.bots.post_message(game_id, send_message, False)
                 else:
-                    # Use Stockfish 17 to find best move
-                    next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
-                    client.bots.make_move(game_id, next_move.uci())
-                    chess_board.push(next_move)
-                    print('I moved')
-                    # Set bot_thinking to 0 so that While iteration can continue
-                    bot_thinking = 0
+                    # Use Lichess Analysis to find the most played human move and get Opening Name
+                    next_move, get_number_played, avg_rating = lichess_analysis_move(fen)
+                    if next_move:
+                        # Move the most played move from Lichess Analysis Board
+                        client.bots.make_move(game_id, next_move)
+                        chess_board.push_uci(next_move)
+                        print('I moved from Lichess Analysis Board')
+                        # Get avg_elo correctly
+                        if avg_rating[-4].startswith(('1', '2', '3')):
+                            avg_rating = avg_rating[-4:]
+                        elif avg_rating[-3].startswith(('1', '2', '3')):
+                            avg_rating = avg_rating[-3:]
+                        send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
+                        client.bots.post_message(game_id, send_message, False)
+                    else:
+                        # Use Stockfish 17 to find best move
+                        next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
+                        client.bots.make_move(game_id, next_move.uci())
+                        chess_board.push(next_move)
+                        print('I moved from Stockfish')
+                        send_message = f'My move is from Stockfish 17'
+                        client.bots.post_message(game_id, send_message, False)
+                # Set bot_thinking to 0 so that While iteration can continue
+                bot_thinking = 0
                 return
             except Exception as e:
                 print(f"Invalid move: {e}")
