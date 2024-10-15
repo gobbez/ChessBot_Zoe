@@ -16,7 +16,6 @@ from selenium.webdriver.common.by import By
 
 import run_telegram_bot
 
-
 # Avoid max recursion limit
 sys.setrecursionlimit(100000)
 
@@ -118,30 +117,33 @@ def lichess_analysis_move(fen):
     # Go to Analysis Board
     link = f'https://lichess.org/analysis/{fen}'
     driver.get(link)
-    # Click on "book icon"
-    driver.find_element(By.CLASS_NAME, 'fbt').click()
-    # Click on Lichess players
-    time.sleep(1)
-    driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
-    # Open filter settings
-    driver.find_element(By.CLASS_NAME, 'toconf').click()
-    # Select only rapid and longer (de-select bullet and blitz)
-    driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
-    driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
-    # Select only >2200 elo
-    for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
-        driver.find_element(By.XPATH, f'//button[text()={i}]').click()
-    # Confirm
-    driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
+    try:
+        # Click on "book icon"
+        driver.find_element(By.CLASS_NAME, 'fbt').click()
+        # Click on Lichess players
+        time.sleep(1)
+        driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
+        # Open filter settings
+        driver.find_element(By.CLASS_NAME, 'toconf').click()
+        # Select only rapid and longer (de-select bullet and blitz)
+        driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
+        driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
+        # Select only >2200 elo
+        for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
+            driver.find_element(By.XPATH, f'//button[text()={i}]').click()
+        # Confirm
+        driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
 
-    # Find element <tr> with data-uci="move"
-    get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
-    # Find number playing
-    get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
-    # Find avg rating
-    avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
-    move = get_move.get_attribute('data-uci')
-    return move, get_num_played, avg_rating
+        # Find element <tr> with data-uci="move"
+        get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
+        # Find number playing
+        get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
+        # Find avg rating
+        avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
+        move = get_move.get_attribute('data-uci')
+        return move, get_num_played, avg_rating
+    except:
+        return 0, 0, 0
 
 
 # OLLAMA CHAT
@@ -358,9 +360,9 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
                     f"CP evaluation: {cp // 100}\n"
                     f"Playing at level: {skill_level}\n"
-                    f"Thinking time: {round(deep_time, 1)}s"
-                    f"Hash Memory: {round(hash_m)}Mb"
-                    f"Moves Depth: {round(depth)}"
+                    f"Thinking time: {round(deep_time, 1)}s\n"
+                    f"Hash Memory: {round(hash_m)}Mb\n"
+                    f"Moves Depth: {round(depth)}\n"
                     f"Threads Num: {round(threads_m)}")
     run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
 
@@ -449,10 +451,12 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                     print('I moved from Opening Book')
                     send_message = f'My move is from a human Opening Repertoire'
                     client.bots.post_message(game_id, send_message, False)
+                    tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
+                    run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
                 else:
                     # Use Lichess Analysis to find the most played human move and get Opening Name
                     next_move, get_number_played, avg_rating = lichess_analysis_move(fen)
-                    if next_move:
+                    if next_move != 0:
                         # Move the most played move from Lichess Analysis Board
                         client.bots.make_move(game_id, next_move)
                         chess_board.push_uci(next_move)
@@ -464,6 +468,8 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                             avg_rating = avg_rating[-3:]
                         send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
                         client.bots.post_message(game_id, send_message, False)
+                        tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
+                        run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
                     else:
                         # Use Stockfish 17 to find best move
                         next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
@@ -482,6 +488,8 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 client.bots.make_move(game_id, rand_move.uci())
                 chess_board.push(rand_move)
                 print('Invalid move.. i moved random')
+                tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
+                run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
                 return
 
 
