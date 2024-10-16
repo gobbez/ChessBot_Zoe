@@ -5,6 +5,8 @@ Telegram Bot to access Lichess Bot results real time!
 Human Opening Books to start as an human (work in progress)
 Ollama chatbot to interact with users (work in progress)
 
+UPDATE: Now bot can find Opening name and human moves (if the game follows real Lichess games)
+
 <table>
   <tr>
     <td>
@@ -15,6 +17,7 @@ Ollama chatbot to interact with users (work in progress)
       <ul>
         <li>Stockfish 17 that change its thinking time and strength level based on the opponent Elo and position</li>
         <li>Lichess users database to find the most played move by humans and communicate in chat the avg_elo and number of times each move is played</li>
+        <li>Tells Opening Name!</li>
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>
         <li>Configure a Telegram Bot to access Lichess Bot games and results.. real time!</li>
         <li>Bot can play multiple games and you can configure bullet too (as of now it's more into rapid or longer)</li>
@@ -39,9 +42,11 @@ It will also change its strength level to try to stay calibrated towards the opp
 You can change Stockfish parameters via Telegram Bot too!
 
 
-### Lichess Human Moves
+### Lichess Human Moves and Opening Name
 For each move, after searching for its Opening Repertories (work in progress), it searches on Lichess Database to find the most played move by human users.
 It will also tell you in the chat how many times that move was played and the average Elo of users playing it!
+
+Bot can also tell which Opening is currently playing with the user!
 
 
 ### Personalized Opening Repertories

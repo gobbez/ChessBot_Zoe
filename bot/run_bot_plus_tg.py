@@ -3,6 +3,7 @@ import asyncio
 import yaml
 import chess
 import chess.engine
+import chess.pgn
 import random
 import pandas as pd
 import threading
@@ -99,11 +100,13 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
 
 
 # Lichess Analysis Move
-def lichess_analysis_move(fen):
+def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
     """
     Connects to Lichess Analysis Board, filters for >2500 Lichess users and play the most played move
     :param fen: fen position
-    :param moves: list of moves played
+    :param game_pgn: pgn of game
+    :param tot_moves: total numbers played in the game
+    :param game_id: id of the game
     :return: the most played move (if any), number of times that move is played, avg_rating of played moves
     """
     # Set up Chrome options for headless browsing
@@ -115,11 +118,39 @@ def lichess_analysis_move(fen):
     driver = webdriver.Chrome(options=chrome_options)
 
     # Go to Analysis Board
-    link = f'https://lichess.org/analysis/{fen}'
+    link = f'https://lichess.org/analysis'
     driver.get(link)
     try:
+        # Write PGN in Lichess Analysis
+        game_pgn = str(game_pgn)
+        write_pgn = driver.find_element(By.CSS_SELECTOR, "textarea.copyable")
+        write_pgn.click()
+        write_pgn.send_keys(game_pgn)
+        driver.find_element(By.CSS_SELECTOR,"button.button.button-thin.bottom-item.bottom-action.text[data-icon='']").click()
         # Click on "book icon"
         driver.find_element(By.CLASS_NAME, 'fbt').click()
+        # Get Opening Name and tell it if it's 3rd move
+        if 1 < tot_moves < 10:
+            print(tot_moves)
+            # driver.find_element(By.CLASS_NAME,'message').click()
+            # Click on move tot_moves to get Opening name
+            move_xpath = f"//index[text()='{tot_moves}']/following-sibling::move"
+            print('ok found move number')
+            move_element = driver.find_element(By.XPATH, move_xpath)
+            move_element.click()
+            print('ok click on move number')
+            time.sleep(2)
+            title_element = driver.find_element(By.CLASS_NAME, "title")
+            title_text = title_element.get_attribute("title")
+            print('ok get title opening')
+            # Send message to Lichess Chat
+            message = f"We are playing this Opening: {title_text}"
+            client.bots.post_message(game_id, message, False)
+            run_telegram_bot.send_message_to_telegram(telegram_token, message)
+            # Go to last move
+            move_xpath = "//index[last()]/following-sibling::move[last()]"
+            move_element = driver.find_element(By.XPATH, move_xpath)
+            move_element.click()
         # Click on Lichess players
         time.sleep(1)
         driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
@@ -133,7 +164,6 @@ def lichess_analysis_move(fen):
             driver.find_element(By.XPATH, f'//button[text()={i}]').click()
         # Confirm
         driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
-
         # Find element <tr> with data-uci="move"
         get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
         # Find number playing
@@ -412,24 +442,19 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
 
         # Update the chess board with all moves
         moves = event['state']['moves'].split()
-        list_white = []
-        list_black = []
-        for i, move in enumerate(moves):
-            if i % 2 == 0:
-                list_white.append(move)
+        tot_moves = len(moves)//2
+        # Create PGN
+        game_pgn = chess.pgn.Game()
+        game_pgn.headers["Event"] = f"VS {opponent_name}"
+        node = game_pgn
+        # Add moves to chessboard and PGN
+        for move in moves:
+            uci_move = chess.Move.from_uci(move)
+            if uci_move in chess_board.legal_moves:
+                chess_board.push(uci_move)
+                node = node.add_variation(uci_move)
             else:
-                list_black.append(move)
-                move_number += 1
-            try:
-                chess_board.push_uci(move)
-            except ValueError:
-                # Handle the case where the move is not valid (e.g., game start)
-                continue
-        # In case white has a move more, meaning it's black turn, update it with an x
-        if len(list_white) != len(list_black):
-            list_black.append('x')
-        # Save moves in a DataFrame (not used anymore)
-        # df_moves = pd.DataFrame({'white': list_white, 'black': list_black})
+                print(f"Move {move} is not legal at the current board state.")
 
         if 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR' in fen:
             # First move plays fixed moves
@@ -455,7 +480,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                     run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
                 else:
                     # Use Lichess Analysis to find the most played human move and get Opening Name
-                    next_move, get_number_played, avg_rating = lichess_analysis_move(fen)
+                    next_move, get_number_played, avg_rating = lichess_analysis_move(fen, game_pgn, tot_moves, game_id)
                     if next_move != 0:
                         # Move the most played move from Lichess Analysis Board
                         client.bots.make_move(game_id, next_move)
