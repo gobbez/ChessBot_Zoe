@@ -439,7 +439,8 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
         try:
             print(f"Playing: {event['id']}")
         except:
-            continue
+            print('Impredictable error..')
+            return
         if 'state' not in event:
             continue  # Skip this event if it doesn't contain the 'state' key
 
@@ -459,66 +460,56 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             else:
                 print(f"Move {move} is not legal at the current board state.")
 
-        if 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR' in fen:
-            # First move plays fixed moves
-            if chess_board.turn == chess.WHITE:
-                initial_move = 'e2e4'
+        # Read Opening Books before using Stockfish 17
+        next_move = read_opening_book(fen)
+        try:
+            if next_move:
+                # Use the move from Opening Books file
+                client.bots.make_move(game_id, next_move)
+                chess_board.push_uci(next_move)
+                print('I moved from Opening Book')
+                send_message = f'My move is from a human Opening Repertoire'
+                client.bots.post_message(game_id, send_message, False)
+                tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
+                run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
             else:
-                initial_move = 'g7g6'
-            client.bots.make_move(game_id, initial_move)
-            chess_board.push_uci(initial_move)
-            print('I made first move')
-        else:
-            # Read Opening Books before using Stockfish 17
-            next_move = read_opening_book(fen)
-            try:
-                if next_move:
-                    # Use the move from Opening Books file
+                # Use Lichess Analysis to find the most played human move and get Opening Name
+                next_move, get_number_played, avg_rating = lichess_analysis_move(fen, game_pgn, tot_moves, game_id)
+                if next_move != 0:
+                    # Move the most played move from Lichess Analysis Board
                     client.bots.make_move(game_id, next_move)
                     chess_board.push_uci(next_move)
-                    print('I moved from Opening Book')
-                    send_message = f'My move is from a human Opening Repertoire'
+                    print('I moved from Lichess Analysis Board')
+                    # Get avg_elo correctly
+                    if avg_rating[-4].startswith(('1', '2', '3')):
+                        avg_rating = avg_rating[-4:]
+                    elif avg_rating[-3].startswith(('1', '2', '3')):
+                        avg_rating = avg_rating[-3:]
+                    send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
                     client.bots.post_message(game_id, send_message, False)
                     tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
                     run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
                 else:
-                    # Use Lichess Analysis to find the most played human move and get Opening Name
-                    next_move, get_number_played, avg_rating = lichess_analysis_move(fen, game_pgn, tot_moves, game_id)
-                    if next_move != 0:
-                        # Move the most played move from Lichess Analysis Board
-                        client.bots.make_move(game_id, next_move)
-                        chess_board.push_uci(next_move)
-                        print('I moved from Lichess Analysis Board')
-                        # Get avg_elo correctly
-                        if avg_rating[-4].startswith(('1', '2', '3')):
-                            avg_rating = avg_rating[-4:]
-                        elif avg_rating[-3].startswith(('1', '2', '3')):
-                            avg_rating = avg_rating[-3:]
-                        send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
-                        client.bots.post_message(game_id, send_message, False)
-                        tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
-                        run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
-                    else:
-                        # Use Stockfish 17 to find best move
-                        next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
-                        client.bots.make_move(game_id, next_move.uci())
-                        chess_board.push(next_move)
-                        print('I moved from Stockfish')
-                        send_message = f'My move is from Stockfish 17'
-                        client.bots.post_message(game_id, send_message, False)
-                # Set bot_thinking to 0 so that While iteration can continue
-                bot_thinking = 0
-                return
-            except Exception as e:
-                print(f"Invalid move: {e}")
-                list_legal_moves = list(chess_board.legal_moves)
-                rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
-                client.bots.make_move(game_id, rand_move.uci())
-                chess_board.push(rand_move)
-                print('Invalid move.. i moved random')
-                tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
-                run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-                return
+                    # Use Stockfish 17 to find best move
+                    next_move = stockfish_best_move(fen, elo_opponent, opponent_name)
+                    client.bots.make_move(game_id, next_move.uci())
+                    chess_board.push(next_move)
+                    print('I moved from Stockfish')
+                    send_message = f'My move is from Stockfish 17'
+                    client.bots.post_message(game_id, send_message, False)
+            # Set bot_thinking to 0 so that While iteration can continue
+            bot_thinking = 0
+            return
+        except Exception as e:
+            print(f"Invalid move: {e}")
+            list_legal_moves = list(chess_board.legal_moves)
+            rand_move = list_legal_moves[random.randint(0, len(list_legal_moves) - 1)]
+            client.bots.make_move(game_id, rand_move.uci())
+            chess_board.push(rand_move)
+            print('Invalid move.. i moved random')
+            tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
+            run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
+            return
 
 
 def handle_events():
@@ -576,7 +567,7 @@ def handle_events():
                         game_threads = [thread for thread in game_threads if thread.is_alive()]
                         # Get wait time
                         set_wait = load_global_db('wait_api', 'global', 'get', 0)
-                        if set_wait < 0:
+                        if set_wait <= 0:
                             print('waiting 15s')
                             time.sleep(15)
                         elif set_wait > 180:
