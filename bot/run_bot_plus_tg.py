@@ -436,7 +436,10 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     move_number = 1  # Initialize move number
 
     for event in client.bots.stream_game_state(game_id):
-        print(f"Playing: {event['id']}")
+        try:
+            print(f"Playing: {event['id']}")
+        except:
+            continue
         if 'state' not in event:
             continue  # Skip this event if it doesn't contain the 'state' key
 
