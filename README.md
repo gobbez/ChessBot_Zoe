@@ -1,11 +1,13 @@
 
 # ChessBot_Zoe
-High Performing - Lichess Bot powered by Lichess Human Databases and Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
+High Performing and Fast - Lichess Bot powered by Lichess Human Databases and Stockfish 17 that can vary thinking time and strength level based on opponent Elo and position evaluation.
+Now bot can find Opening name and human moves, plus its 10x faster!
 Telegram Bot to access Lichess Bot results real time!
-Human Opening Books to start as an human (work in progress)
 Ollama chatbot to interact with users (work in progress)
 
-UPDATE: Now bot can find Opening name and human moves (if the game follows real Lichess games)
+## Massive Update [19/10/2024]
+-Now bot can play even blitz or bullets if you want, improved the API calls to make it 10x faster!
+-Now bot can find Opening name and human moves (if the game follows real Lichess games)
 
 <table>
   <tr>
@@ -92,19 +94,12 @@ Please note that these times can become a lot more longer in a real game in a co
   <tr>
     <td>1 / 15 sec</td>
     <td>5 / 10 sec</td>
-    <td>10 / 20 sec</td>
+    <td>0 / 5 sec</td>
     <td>20 / 30 sec</td>
   </tr>
 </table>
 
 
-
-#### Current version
-
-For now it uses Stockfish with different analysis times and strength level in base of the opponent Elo and position evaluation.
-I'm working on adding some specific opening Repertories and Ollama for chat with the user
-
-Working to make it improve!
 
 ##### About this repo
 
