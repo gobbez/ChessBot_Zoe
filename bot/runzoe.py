@@ -14,12 +14,9 @@ import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-
 import run_telegram_bot
-
 # Avoid max recursion limit
 sys.setrecursionlimit(100000)
-
 THIS_FOLDER = Path(__file__).parent.resolve()
 # Path of Stockfish binary
 STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
@@ -28,28 +25,20 @@ config_path = THIS_FOLDER / "config.yml"
 king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
 # Ollama chat
 df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
-
 # global variable to stop while if Stockfish is thinking (1 = stop while)
 bot_thinking = 0
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
-
 # List of active games id:
 list_playing_id = []
-
-
 # Load configuration from file config.yml
 with open(config_path, 'r') as config_file:
     config = yaml.safe_load(config_file)
-
 # Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
-
 # Configure Telegram bot with token
 telegram_token = config['tg_token']
-
-
 # Global shared (between Lichess and Telegram Bots) functions
 def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
@@ -78,9 +67,8 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'thread' and len(df_global) == 1:
                 return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
-                return df_global['Wait_Api'][0]
-            elif search_for == 'challenge' and len(df_global) == 1:
-                return df_global['Send_Challenge'][0]
+                set_wait = df_global['Wait_Api'][0]
+                return set_wait
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -101,23 +89,12 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
-            elif search_for == 'challenge':
-                df_global.loc[df_global['Game'] == game_for, 'Send_Challenge'] = add_value
-                df_global.to_csv(global_csv)
-                if add_value != 0:
-                    # Start searching for a bot to challenge with Elo as sent
-                    send_challenge(add_value)
-
-
 def random_chat():
     global df_chat
     chat = df_chat['Intro_message'].to_list()
     send_random_chat = chat[random.randint(0, len(chat))]
     return send_random_chat
-
-
-
-def send_challenge(elo_setted=0):
+def send_challenge():
     """
     Automatize Lichess to send challenges to other Bots
     :return:
@@ -127,37 +104,17 @@ def send_challenge(elo_setted=0):
     active_bots = client.bots.get_online_bots()
     list_bots = []
     for bot in active_bots:
-        if elo_setted != 0:
-            # If Elo is setted then challenge the elo setted
-            if bot['perfs']['classical']['rating'] >= elo_setted:
-                list_bots.append(bot['username'])
-                # Challenge a random > elo_setted bot on standard cadence
-                rand_bot = list_bots[random.randint(0, len(list_bots))]
-                client.challenges.create(username=f"{rand_bot}",
-                                         rated=True,
-                                         clock_limit=1800,
-                                         clock_increment=30)
-                message = f'Challenging: {rand_bot}'
-                print(message)
-                run_telegram_bot.send_message_to_telegram(telegram_token, message)
-        else:
-            if bot['perfs']['classical']['rating'] >= 2300:
-                # If Elo isn't setted then challenge >= 2300
-                list_bots.append(bot['username'])
-                # Challenge a random > 2300 bot on standard cadence
-                rand_bot = list_bots[random.randint(0, len(list_bots))]
-                client.challenges.create(username=f"{rand_bot}",
-                                         rated=True,
-                                         clock_limit=1800,
-                                         clock_increment=30)
-                message = f'Challenging: {rand_bot}'
-                print(message)
-                run_telegram_bot.send_message_to_telegram(telegram_token, message)
-        # Reset elo to search as default
-        load_global_db('challenge', 'global', 'set', 0)
-
-
-
+        if bot['perfs']['classical']['rating'] >= 2300:
+            list_bots.append(bot['username'])
+            # Challenge a random > 2300 bot on standard cadence
+            rand_bot = list_bots[random.randint(0, len(list_bots))]
+            client.challenges.create(username=f"{rand_bot}",
+                                     rated=True,
+                                     clock_limit=1800,
+                                     clock_increment=30)
+            message = f'Challenging: {rand_bot}'
+            print(message)
+            run_telegram_bot.send_message_to_telegram(telegram_token, message)
 # Lichess Analysis Move
 def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
     """
@@ -175,7 +132,6 @@ def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     # Initialize the driver with the specified options
     driver = webdriver.Chrome(options=chrome_options)
-
     # Go to Analysis Board
     link = f'https://lichess.org/analysis'
     driver.get(link)
@@ -233,8 +189,6 @@ def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
         return move, get_num_played, avg_rating
     except:
         return 0, 0, 0
-
-
 # STOCKFISH FUNCTIONS
 def evaluate_position_cp(fen):
     """
@@ -253,8 +207,6 @@ def evaluate_position_cp(fen):
         else:
             cp = int(cp)
         return cp
-
-
 def stockfish_best_move(fen, opponent_elo, opponent_name):
     """
     Stockfish analyzes position and finds the best move with its parameters based on opponent_elo
@@ -263,7 +215,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
     :return: best move for that thinking time
     """
     global STOCKFISH_PATH
-
     def get_level_time():
         # Set base level, thinking time, hash memory, move depth and threads_m
         if opponent_elo <= 700:
@@ -309,14 +260,11 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
             depth = 25
             threads_m = 18
         return deep_time, skill_level, hash_m, depth, threads_m
-
     # Set the board position
     board = chess.Board(fen)
-
     # Evaluate position CP to determine how the bot is playing (level, thinking time, hash memory, moves depth, threads)
     cp = evaluate_position_cp(fen)
     deep_time, skill_level, hash_m, depth, threads_m = get_level_time()
-
     if cp > 800:
         skill_level = 20
     elif 400 < cp <= 600:
@@ -364,12 +312,10 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         skill_level = 20
         hash_m = hash_m * 1.5 + 300
         threads_m *= 1.4
-
     if skill_level < 1:
         skill_level = 1
     elif skill_level > 20:
         skill_level = 20
-
     # Check if a shared global var Level is setted (to modify level from Telegram Bot)
     set_level = load_global_db('level', 'global', 'get', 0)
     if set_level <= 0 or set_level is None:
@@ -381,7 +327,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         skill_level = 20
     else:
         skill_level = set_level
-
     # Check if shared global var Think is setted (to modify thinking time from Telegram Bot)
     set_think = load_global_db('think', 'global', 'get', 0)
     if set_think <= 0 or set_think is None:
@@ -391,7 +336,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         deep_time = 3600
     else:
         deep_time = set_think
-
     # Check if shared global var Hash is setted (to modify hash memory from Telegram Bot)
     set_hash = load_global_db('hash', 'global', 'get', 0)
     if set_hash <= 0 or set_hash is None:
@@ -401,7 +345,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         hash_m = 2100
     else:
         hash_m = set_hash
-
     # Check if shared global var Depth is setted (to modify depth moves from Telegram Bot)
     set_depth = load_global_db('depth', 'global', 'get', 0)
     if set_depth <= 0 or set_depth is None:
@@ -411,7 +354,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         depth = 30
     else:
         depth = set_depth
-
     # Check if shared global var Thread is setted (to modify threads from Telegram Bot)
     set_thread = load_global_db('thread', 'global', 'get', 0)
     if set_thread <= 0 or set_thread is None:
@@ -421,7 +363,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         threads_m = 20
     else:
         threads_m = set_thread
-
     # Send message to Telegram Bot
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
                     f"CP evaluation: {cp // 100}\n"
@@ -431,7 +372,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
                     f"Moves Depth: {round(depth)}\n"
                     f"Threads Num: {round(threads_m)}")
     run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
-
     with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
         # Set hash size (in MB)
         engine.configure({"Hash": hash_m})
@@ -440,10 +380,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         # Set level
         engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time, depth=depth))
-
     return result.move
-
-
 def read_opening_book(fen):
     """
     Read the files of Opening and follow them.
@@ -458,8 +395,6 @@ def read_opening_book(fen):
     for move in df_move:
         move = str(move)
         return move
-
-
 def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     """
     This function handles the moves on Lichess and saves moves.
@@ -470,7 +405,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     global bot_thinking
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
-
     for event in client.bots.stream_game_state(game_id):
         try:
             print(f"Playing: {event['id']}")
@@ -479,7 +413,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             return
         if 'state' not in event:
             continue  # Skip this event if it doesn't contain the 'state' key
-
         # Update the chess board with all moves
         moves = event['state']['moves'].split()
         tot_moves = len(moves)//2
@@ -495,7 +428,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 node = node.add_variation(uci_move)
             else:
                 print(f"Move {move} is not legal at the current board state.")
-
         # Read Opening Books before using Stockfish 17
         next_move = read_opening_book(fen)
         try:
@@ -547,8 +479,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
             bot_thinking = 0
             return
-
-
 def handle_events():
     global bot_thinking
     counter = 0
@@ -560,20 +490,16 @@ def handle_events():
                 counter += 1
                 counter_challenge += 1
                 print(f'While loop {counter}')
-
                 # Checks for challenges each 100 loops -- work in progress
                 if counter > 100:
                     counter = 0
                     get_challenges()
-
                 if counter_challenge > 10000:
                     counter_challenge = 0
                     send_challenge()
-
                 # Get number of active games
                 ongoing_games = client.games.get_ongoing()
                 list_games_id = [game['gameId'] for game in ongoing_games]
-
                 # Stream every games
                 events = client.games.get_ongoing()
                 for event in events:
@@ -593,7 +519,6 @@ def handle_events():
                         opponent_name = event['opponent']['username']
                         print('My turn')
                         handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
-
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
@@ -608,14 +533,12 @@ def handle_events():
         bot_thinking = 0
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
-
-
 def get_challenges():
     """Work in progress"""
     global bot_thinking
     if bot_thinking == 0:
         print('Checking challenges')
-        events = client.bots.stream_incoming_events()
+        events = client.bots
         for event in events:
             if event['type'] == 'challenge':
                 if event['challenge']['speed'] in ['standard', 'correspondence']:
@@ -630,10 +553,5 @@ def get_challenges():
     else:
         print('Bot is thinking. I cannot check challenges')
     return
-
-
 if __name__ == "__main__":
     handle_events()
-
-
-

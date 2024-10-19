@@ -47,9 +47,8 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'thread' and len(df_global) == 1:
                 return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
-                return df_global['Wait_Api'][0]
-            elif search_for == 'challenge' and len(df_global) == 1:
-                return df_global['Send_Challenge'][0]
+                set_wait = df_global['Wait_Api'][0]
+                return set_wait
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -70,12 +69,6 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
-            elif search_for == 'challenge':
-                df_global.loc[df_global['Game'] == game_for, 'Send_Challenge'] = add_value
-                df_global.to_csv(global_csv)
-                if add_value != 0:
-                    # Start searching for a bot to challenge with Elo as sent
-                    send_challenge(add_value)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
