@@ -31,7 +31,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    global_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
+    global_csv = THIS_FOLDER / "database/Settings.csv"
     df_global = pd.read_csv(global_csv)
     if action == 'get':
         if game_for == 'global':
@@ -47,8 +47,9 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'thread' and len(df_global) == 1:
                 return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
-                set_wait = df_global['Wait_Api'][0]
-                return set_wait
+                return df_global['Wait_Api'][0]
+            elif search_for == 'challenge' and len(df_global) == 1:
+                return df_global['Send_Challenge'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -69,6 +70,12 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
+            elif search_for == 'challenge':
+                df_global.loc[df_global['Game'] == game_for, 'Send_Challenge'] = add_value
+                df_global.to_csv(global_csv)
+                if add_value != 0:
+                    # Start searching for a bot to challenge with Elo as sent
+                    send_challenge(add_value)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -142,25 +149,30 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 set_hash = int(text_received[8:])
                 load_global_db('hash', 'global', 'set', set_hash)
                 value_setted = load_global_db('hash', 'global', 'get', 0)
-                await update.message.reply_text(f"Hash Memory setted: {value_setted}s")
+                await update.message.reply_text(f"Hash Memory setted: {value_setted}")
             # Set Depth Moves
             elif text_received.startswith('set_depth'):
                 set_depth = int(text_received[9:])
                 load_global_db('depth', 'global', 'set', set_depth)
                 value_setted = load_global_db('depth', 'global', 'get', 0)
-                await update.message.reply_text(f"Depth moves setted: {value_setted}s")
+                await update.message.reply_text(f"Depth moves setted: {value_setted}")
             # Set Threads Number
             elif text_received.startswith('set_thread'):
                 set_thread = int(text_received[10:])
                 load_global_db('thread', 'global', 'set', set_thread)
                 value_setted = load_global_db('thread', 'global', 'get', 0)
-                await update.message.reply_text(f"Threads number setted: {value_setted}s")
+                await update.message.reply_text(f"Threads number setted: {value_setted}")
             # Set Api Waiting Time (time.sleep)
             elif text_received.startswith('set_wait_api'):
                 set_wait = int(text_received[12:])
                 load_global_db('wait_api', 'global', 'set', set_wait)
                 value_setted = load_global_db('wait_api', 'global', 'get', 0)
                 await update.message.reply_text(f"Wait Api setted: {value_setted}s")
+            elif text_received.startswith('set_challenge'):
+                set_challenge = int(text_received[13:])
+                load_global_db('challenge', 'global', 'set', set_challenge)
+                value_setted = load_global_db('challenge', 'global', 'get', 0)
+                await update.message.reply_text(f"Challenge mode ON: {value_setted}")
     except:
         await update.message.reply_text("Wrong value for setting..")
 

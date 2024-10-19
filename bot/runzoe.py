@@ -62,7 +62,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    global_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
+    global_csv = THIS_FOLDER / "database/Settings.csv"
     df_global = pd.read_csv(global_csv)
     if action == 'get':
         if game_for == 'global':
@@ -78,8 +78,9 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'thread' and len(df_global) == 1:
                 return df_global['Thread'][0]
             elif search_for == 'wait_api' and len(df_global) == 1:
-                set_wait = df_global['Wait_Api'][0]
-                return set_wait
+                return df_global['Wait_Api'][0]
+            elif search_for == 'challenge' and len(df_global) == 1:
+                return df_global['Send_Challenge'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -100,6 +101,12 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
+            elif search_for == 'challenge':
+                df_global.loc[df_global['Game'] == game_for, 'Send_Challenge'] = add_value
+                df_global.to_csv(global_csv)
+                if add_value != 0:
+                    # Start searching for a bot to challenge with Elo as sent
+                    send_challenge(add_value)
 
 
 def random_chat():
@@ -110,7 +117,7 @@ def random_chat():
 
 
 
-def send_challenge():
+def send_challenge(elo_setted=0):
     """
     Automatize Lichess to send challenges to other Bots
     :return:
@@ -120,17 +127,34 @@ def send_challenge():
     active_bots = client.bots.get_online_bots()
     list_bots = []
     for bot in active_bots:
-        if bot['perfs']['classical']['rating'] >= 2300:
-            list_bots.append(bot['username'])
-            # Challenge a random > 2300 bot on standard cadence
-            rand_bot = list_bots[random.randint(0, len(list_bots))]
-            client.challenges.create(username=f"{rand_bot}",
-                                     rated=True,
-                                     clock_limit=1800,
-                                     clock_increment=30)
-            message = f'Challenging: {rand_bot}'
-            print(message)
-            run_telegram_bot.send_message_to_telegram(telegram_token, message)
+        if elo_setted != 0:
+            # If Elo is setted then challenge the elo setted
+            if bot['perfs']['classical']['rating'] >= elo_setted:
+                list_bots.append(bot['username'])
+                # Challenge a random > elo_setted bot on standard cadence
+                rand_bot = list_bots[random.randint(0, len(list_bots))]
+                client.challenges.create(username=f"{rand_bot}",
+                                         rated=True,
+                                         clock_limit=1800,
+                                         clock_increment=30)
+                message = f'Challenging: {rand_bot}'
+                print(message)
+                run_telegram_bot.send_message_to_telegram(telegram_token, message)
+        else:
+            if bot['perfs']['classical']['rating'] >= 2300:
+                # If Elo isn't setted then challenge >= 2300
+                list_bots.append(bot['username'])
+                # Challenge a random > 2300 bot on standard cadence
+                rand_bot = list_bots[random.randint(0, len(list_bots))]
+                client.challenges.create(username=f"{rand_bot}",
+                                         rated=True,
+                                         clock_limit=1800,
+                                         clock_increment=30)
+                message = f'Challenging: {rand_bot}'
+                print(message)
+                run_telegram_bot.send_message_to_telegram(telegram_token, message)
+        # Reset elo to search as default
+        load_global_db('challenge', 'global', 'set', 0)
 
 
 
@@ -591,7 +615,7 @@ def get_challenges():
     global bot_thinking
     if bot_thinking == 0:
         print('Checking challenges')
-        events = client.bots
+        events = client.bots.stream_incoming_events()
         for event in events:
             if event['type'] == 'challenge':
                 if event['challenge']['speed'] in ['standard', 'correspondence']:
