@@ -14,7 +14,10 @@ import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+
 import run_telegram_bot
+
+
 # Avoid max recursion limit
 sys.setrecursionlimit(100000)
 THIS_FOLDER = Path(__file__).parent.resolve()
@@ -39,6 +42,9 @@ session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
 # Configure Telegram bot with token
 telegram_token = config['tg_token']
+
+
+
 # Global shared (between Lichess and Telegram Bots) functions
 def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
@@ -89,11 +95,15 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
+
+
 def random_chat():
     global df_chat
     chat = df_chat['Intro_message'].to_list()
     send_random_chat = chat[random.randint(0, len(chat))]
     return send_random_chat
+
+
 def send_challenge():
     """
     Automatize Lichess to send challenges to other Bots
@@ -115,6 +125,8 @@ def send_challenge():
             message = f'Challenging: {rand_bot}'
             print(message)
             run_telegram_bot.send_message_to_telegram(telegram_token, message)
+
+
 # Lichess Analysis Move
 def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
     """
@@ -189,6 +201,8 @@ def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
         return move, get_num_played, avg_rating
     except:
         return 0, 0, 0
+
+
 # STOCKFISH FUNCTIONS
 def evaluate_position_cp(fen):
     """
@@ -207,6 +221,7 @@ def evaluate_position_cp(fen):
         else:
             cp = int(cp)
         return cp
+
 def stockfish_best_move(fen, opponent_elo, opponent_name):
     """
     Stockfish analyzes position and finds the best move with its parameters based on opponent_elo
@@ -381,6 +396,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time, depth=depth))
     return result.move
+
 def read_opening_book(fen):
     """
     Read the files of Opening and follow them.
@@ -395,6 +411,8 @@ def read_opening_book(fen):
     for move in df_move:
         move = str(move)
         return move
+
+
 def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     """
     This function handles the moves on Lichess and saves moves.
@@ -468,6 +486,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             # Set bot_thinking to 0 so that While iteration can continue
             bot_thinking = 0
             return
+
         except Exception as e:
             print(f"Invalid move: {e}")
             list_legal_moves = list(chess_board.legal_moves)
@@ -479,6 +498,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
             bot_thinking = 0
             return
+
 def handle_events():
     global bot_thinking
     counter = 0
@@ -490,22 +510,22 @@ def handle_events():
                 counter += 1
                 counter_challenge += 1
                 print(f'While loop {counter}')
-                # Checks for challenges each 100 loops -- work in progress
-                if counter > 100:
-                    counter = 0
-                    get_challenges()
-                if counter_challenge > 10000:
+
+                if counter_challenge > 1000:
                     counter_challenge = 0
                     send_challenge()
+
                 # Get number of active games
                 ongoing_games = client.games.get_ongoing()
                 list_games_id = [game['gameId'] for game in ongoing_games]
+
                 # Stream every games
                 events = client.games.get_ongoing()
                 for event in events:
                     is_bot_turn = event['isMyTurn']
                     game_id = event['gameId']
                     print(game_id)
+
                     # Check if it's Bot Turn and if id is not in thread_list (prevent multiple threads on same game)
                     if is_bot_turn:
                         # Set bot_thinking to 1 in order to stop While iteration
@@ -519,6 +539,7 @@ def handle_events():
                         opponent_name = event['opponent']['username']
                         print('My turn')
                         handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
+
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
@@ -533,25 +554,7 @@ def handle_events():
         bot_thinking = 0
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
-def get_challenges():
-    """Work in progress"""
-    global bot_thinking
-    if bot_thinking == 0:
-        print('Checking challenges')
-        events = client.bots
-        for event in events:
-            if event['type'] == 'challenge':
-                if event['challenge']['speed'] in ['standard', 'correspondence']:
-                    # Accepting only rapid, standard and correspondence games for now (both rated and not)
-                    # Send message to Telegram Bot
-                    send_message = f"Accepted challenge {event}"
-                    run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
-                    challenge_id = event['challenge']['id']
-                    client.bots.accept_challenge(challenge_id)
-                    print('Challenge accepted!')
-            return
-    else:
-        print('Bot is thinking. I cannot check challenges')
-    return
+
+
 if __name__ == "__main__":
     handle_events()
