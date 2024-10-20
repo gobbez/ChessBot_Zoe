@@ -32,6 +32,8 @@ df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
 bot_thinking = 0
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
+# Make the bot try 3 times
+try_challenge = 0
 # List of active games id:
 list_playing_id = []
 # Load configuration from file config.yml
@@ -107,24 +109,32 @@ def random_chat():
 def send_challenge():
     """
     Automatize Lichess to send challenges to other Bots
-    :return:
     """
-    global challenge_mode
-    # Try this
-    active_bots = client.bots.get_online_bots()
-    list_bots = []
-    for bot in active_bots:
-        if bot['perfs']['classical']['rating'] >= 2300:
-            list_bots.append(bot['username'])
-            # Challenge a random > 2300 bot on standard cadence
-            rand_bot = list_bots[random.randint(0, len(list_bots))]
-            client.challenges.create(username=f"{rand_bot}",
-                                     rated=True,
-                                     clock_limit=1800,
-                                     clock_increment=30)
-            message = f'Challenging: {rand_bot}'
-            print(message)
-            run_telegram_bot.send_message_to_telegram(telegram_token, message)
+    global challenge_mode, try_challenge
+    if try_challenge <= 3:
+        try:
+            active_bots = client.bots.get_online_bots()
+            list_bots = []
+            for bot in active_bots:
+                if bot['perfs']['classical']['rating'] >= 2300:
+                    list_bots.append(bot['username'])
+
+            if list_bots:
+                # Challenge a random > 2300 bot on rapid cadence
+                rand_bot = random.choice(list_bots)
+                client.challenges.create(username=rand_bot,
+                                         rated=True,
+                                         clock_limit=900,
+                                         clock_increment=14)
+                message = f'Challenging: {rand_bot}'
+                print(message)
+                run_telegram_bot.send_message_to_telegram(telegram_token, message)
+                try_challenge = 0
+            else:
+                print("No bots with rating >= 2300 found.")
+        except Exception as e:
+            print(f'Error: {e}')
+            try_challenge += 1
 
 
 # Lichess Analysis Move
@@ -511,7 +521,7 @@ def handle_events():
                 counter_challenge += 1
                 print(f'While loop {counter}')
 
-                if counter_challenge > 1000:
+                if counter_challenge > 2000:
                     counter_challenge = 0
                     send_challenge()
 
