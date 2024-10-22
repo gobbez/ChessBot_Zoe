@@ -132,15 +132,15 @@ def send_challenge():
     global challenge_mode, try_challenge
     if try_challenge <= 3:
         try:
-            set_challenge_time = load_global_db('challenge_time', 'global', 'get', 0)
-            set_challenge_increment = load_global_db('challenge_increment', 'global', 'get', 0)
-            set_challenge_oppelo = load_global_db('challenge_opp_elo', 'global', 'get', 0)
+            set_challenge_time = int(load_global_db('challenge_time', 'global', 'get', 0))
+            set_challenge_increment = int(load_global_db('challenge_increment', 'global', 'get', 0))
+            set_challenge_oppelo = int(load_global_db('challenge_opp_elo', 'global', 'get', 0))
             if set_challenge_time < 180:
                 challenge_time = 900
             else:
                 challenge_time = set_challenge_time
             if set_challenge_increment <= 0:
-                challenge_increment = 0
+                challenge_increment = 14
             else:
                 challenge_increment = set_challenge_increment
             if set_challenge_oppelo <= 0:
@@ -152,7 +152,6 @@ def send_challenge():
             active_bots = client.bots.get_online_bots()
             list_bots = []
             for bot in active_bots:
-                print(bot)
                 if bot['perfs']['classical']['rating'] >= round(challenge_elo):
                     list_bots.append(bot['username'])
 

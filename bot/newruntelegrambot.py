@@ -55,7 +55,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'challenge_increment' and len(df_global) == 1:
                 return df_global['Challenge_Increment'][0]
             elif search_for == 'challenge_opp_elo' and len(df_global) == 1:
-                return df_global['Challenge_Opp_Elo'][0]
+                return df_global['Challenge_Opponent_Elo'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -86,7 +86,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Increment'] = add_value
                 df_global.to_csv(global_csv)
             elif search_for == 'challenge_opp_elo':
-                df_global.loc[df_global['Game'] == game_for, 'Challenge_Opp_Elo'] = add_value
+                df_global.loc[df_global['Game'] == game_for, 'Challenge_Opponent_Elo'] = add_value
                 df_global.to_csv(global_csv)
 
 
