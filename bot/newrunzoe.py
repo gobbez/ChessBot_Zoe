@@ -83,7 +83,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
             elif search_for == 'challenge_increment' and len(df_global) == 1:
                 return df_global['Challenge_Increment'][0]
             elif search_for == 'challenge_opp_elo' and len(df_global) == 1:
-                return df_global['Challenge_Opp_Elo'][0]
+                return df_global['Challenge_Opponent_Elo'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
@@ -114,7 +114,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Increment'] = add_value
                 df_global.to_csv(global_csv)
             elif search_for == 'challenge_opp_elo':
-                df_global.loc[df_global['Game'] == game_for, 'Challenge_Opp_Elo'] = add_value
+                df_global.loc[df_global['Game'] == game_for, 'Challenge_Opponent_Elo'] = add_value
                 df_global.to_csv(global_csv)
 
 
@@ -546,22 +546,19 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
 
 def handle_events():
     global bot_thinking
-    counter = 0
     counter_challenge = 0
     try:
         while True:
             # Process only if Stockfish isn't thinking a move
             if bot_thinking == 0:
-                counter += 1
                 counter_challenge += 1
-                print(f'While loop {counter}')
 
-                challenge_loops = 2000
                 set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
                 if set_challenge_loops < 100:
                     challenge_loops = 2000
                 else:
                     challenge_loops = set_challenge_loops
+                print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
                 if counter_challenge > challenge_loops:
                     counter_challenge = 0
                     send_challenge()

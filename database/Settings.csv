@@ -1,2 +1,2 @@
-,Game,Level,Think,Hash,Depth,Thread,Wait_Api,Challenge_Loops,Challenge_Time,Challenge_Increment,Challenge_Opponent_Elo,Challenge_Opp_Elo
-0,global,0,0,0,0,0,0,0,0,0,3000,3000.0
+Game,Level,Think,Hash,Depth,Thread,Wait_Api,Challenge_Loops,Challenge_Time,Challenge_Increment,Challenge_Opponent_Elo
+global,0,0,0,0,0,0,0,0,0,3000
