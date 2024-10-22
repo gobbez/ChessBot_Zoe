@@ -148,10 +148,12 @@ def send_challenge():
             else:
                 challenge_elo = set_challenge_oppelo
 
+            print(f'Searching for bots with Elo >= {challenge_elo}')
             active_bots = client.bots.get_online_bots()
             list_bots = []
             for bot in active_bots:
-                if bot['perfs']['classical']['rating'] >= challenge_elo:
+                print(bot)
+                if bot['perfs']['classical']['rating'] >= round(challenge_elo):
                     list_bots.append(bot['username'])
 
             if list_bots:
@@ -166,7 +168,7 @@ def send_challenge():
                 run_telegram_bot.send_message_to_telegram(telegram_token, message)
                 try_challenge = 0
             else:
-                print("No bots with rating >= 2300 found.")
+                print(f"No bots with rating >= {challenge_elo} found.")
         except Exception as e:
             print(f'Error: {e}')
             try_challenge += 1
