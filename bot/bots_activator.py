@@ -1,4 +1,4 @@
-import run_telegram_bot
+import newruntelegrambot
 
 
-run_telegram_bot.activate_bot()
+newruntelegrambot.activate_bot()
