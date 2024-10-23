@@ -654,5 +654,4 @@ def check_challenges():
 
 
 if __name__ == "__main__":
-    check_challenges()
-    #handle_events()
+    handle_events()
