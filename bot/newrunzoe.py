@@ -42,9 +42,11 @@ with open(config_path, 'r') as config_file:
 # Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
+# Configure Challenges Lichess client to read challenges only
+challenges_session = berserk.TokenSession(config['challenges_token'])
+client_challenges = berserk.Client(session=challenges_session)
 # Configure Telegram bot with token
 telegram_token = config['tg_token']
-
 
 
 # Global shared (between Lichess and Telegram Bots) functions
@@ -123,6 +125,21 @@ def random_chat():
     chat = df_chat['Intro_message'].to_list()
     send_random_chat = chat[random.randint(0, len(chat))]
     return send_random_chat
+
+
+def create_challenge(username, ch_time, ch_incr):
+    """
+    For Telegram only, make the bot challenge the user with the Telegram Bot button
+    """
+    global try_challenge
+    client.challenges.create(username=username,
+                             rated=False,
+                             clock_limit=ch_time,
+                             clock_increment=ch_incr)
+    message = f'Challenging USER: {username}'
+    print(message)
+    run_telegram_bot.send_message_to_telegram(telegram_token, message)
+    try_challenge = 0
 
 
 def send_challenge():
@@ -564,6 +581,10 @@ def handle_events():
                     counter_challenge = 0
                     send_challenge()
 
+                # Check challenges
+                if challenge_loops % 5 == 0:
+                    check_challenges()
+
                 # Get number of active games
                 ongoing_games = client.games.get_ongoing()
                 list_games_id = [game['gameId'] for game in ongoing_games]
@@ -605,5 +626,33 @@ def handle_events():
         handle_events()  # Restart the event handling after the wait
 
 
+def check_challenges():
+    challenges = client_challenges.challenges.get_mine()
+    for challenge in challenges['in']:
+        print(challenge)
+        challenger = challenge['challenger']['id']
+        try:
+            challenge_cadence = challenge['speed']
+        except:
+            challenge_cadence = challenge['timeControl']['type']
+        challenge_id = challenge['id']
+        try:
+            if challenge_cadence == 'correspondence' and challenge['timeControl']['type'] != 'unlimited':
+                client.bots.accept_challenge(challenge_id)
+                print(f"New Challenger: {challenger} on {challenge_cadence}")
+            else:
+                client.bots.decline_challenge(challenge_id=challenge_id, reason='timeControl')
+        except:
+            try:
+                if (challenge['timeControl']['limit'] >= 900 and challenge['timeControl']['increment'] >= 14) or challenge['speed'] == 'standard':
+                    client.bots.accept_challenge(challenge_id)
+                    print(f"New Challenger: {challenger} on {challenge_cadence}")
+                else:
+                    client.bots.decline_challenge(challenge_id=challenge_id, reason='tooFast')
+            except:
+                client.bots.decline_challenge(challenge_id=challenge_id, reason='later')
+
+
 if __name__ == "__main__":
-    handle_events()
+    check_challenges()
+    #handle_events()
