@@ -1,4 +1,5 @@
 token: "insert_token"
+challenges_token: "insert ch token"
 log: "lichess-bot.log"
 engine:
   dir: "Stockfish path"
