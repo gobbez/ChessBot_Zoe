@@ -18,6 +18,7 @@ Ollama chatbot to interact with users (work in progress)
       <h1>Main Features</h1>
       <ul>
         <li>Stockfish 17 that change its thinking time and strength level based on the opponent Elo and position</li>
+        <li>It can play from bullet to correspondence games (for now it accepts rapid/standard/correspondence only but soon it will accept everything.. )
         <li>Lichess users database to find the most played move by humans and communicate in chat the avg_elo and number of times each move is played</li>
         <li>Tells Opening Name!</li>
         <li>Personalized Opening Repertories to let the Bot follow your preferite lines (work in progress)</li>

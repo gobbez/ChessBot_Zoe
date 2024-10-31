@@ -34,9 +34,6 @@ king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
 # Ollama chat
 df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
 
-# global variable to stop while if Stockfish is thinking (1 = stop while)
-bot_thinking = 0
-
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
 # Make the bot try 3 times
@@ -44,6 +41,10 @@ try_challenge = 0
 
 # List of active games id:
 list_playing_id = []
+
+# List of active games with less than 2':
+hurry_list = []
+
 
 # Load configuration from file config.yml
 with open(config_path, 'r') as config_file:
@@ -214,69 +215,73 @@ def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
     :param game_id: id of the game
     :return: the most played move (if any), number of times that move is played, avg_rating of played moves
     """
-    # Set up Chrome options for headless browsing
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    # Initialize the driver with the specified options
-    driver = webdriver.Chrome(options=chrome_options)
-    # Go to Analysis Board
-    link = f'https://lichess.org/analysis'
-    driver.get(link)
-    try:
-        # Write PGN in Lichess Analysis
-        game_pgn = str(game_pgn)
-        write_pgn = driver.find_element(By.CSS_SELECTOR, "textarea.copyable")
-        write_pgn.click()
-        write_pgn.send_keys(game_pgn)
-        driver.find_element(By.CSS_SELECTOR,"button.button.button-thin.bottom-item.bottom-action.text[data-icon='']").click()
-        # Click on "book icon"
-        driver.find_element(By.CLASS_NAME, 'fbt').click()
-        # Get Opening Name and tell it if it's 3rd move
-        if 1 < tot_moves < 10:
-            print(tot_moves)
-            # driver.find_element(By.CLASS_NAME,'message').click()
-            # Click on move tot_moves to get Opening name
-            move_xpath = f"//index[text()='{tot_moves}']/following-sibling::move"
-            print('ok found move number')
-            move_element = driver.find_element(By.XPATH, move_xpath)
-            move_element.click()
-            print('ok click on move number')
-            time.sleep(2)
-            title_element = driver.find_element(By.CLASS_NAME, "title")
-            title_text = title_element.get_attribute("title")
-            print('ok get title opening')
-            # Send message to Lichess Chat
-            message = f"We are playing this Opening: {title_text}"
-            client.bots.post_message(game_id, message, False)
-            run_telegram_bot.send_message_to_telegram(telegram_token, message)
-            # Go to last move
-            move_xpath = "//index[last()]/following-sibling::move[last()]"
-            move_element = driver.find_element(By.XPATH, move_xpath)
-            move_element.click()
-        # Click on Lichess players
-        time.sleep(1)
-        driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
-        # Open filter settings
-        driver.find_element(By.CLASS_NAME, 'toconf').click()
-        # Select only rapid and longer (de-select bullet and blitz)
-        driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
-        driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
-        # Select only >2200 elo
-        for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
-            driver.find_element(By.XPATH, f'//button[text()={i}]').click()
-        # Confirm
-        driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
-        # Find element <tr> with data-uci="move"
-        get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
-        # Find number playing
-        get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
-        # Find avg rating
-        avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
-        move = get_move.get_attribute('data-uci')
-        return move, get_num_played, avg_rating
-    except:
+    # Use Lichess only if game has more than 2'
+    if game_id not in hurry_list:
+        # Set up Chrome options for headless browsing
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        # Initialize the driver with the specified options
+        driver = webdriver.Chrome(options=chrome_options)
+        # Go to Analysis Board
+        link = f'https://lichess.org/analysis'
+        driver.get(link)
+        try:
+            # Write PGN in Lichess Analysis
+            game_pgn = str(game_pgn)
+            write_pgn = driver.find_element(By.CSS_SELECTOR, "textarea.copyable")
+            write_pgn.click()
+            write_pgn.send_keys(game_pgn)
+            driver.find_element(By.CSS_SELECTOR,"button.button.button-thin.bottom-item.bottom-action.text[data-icon='']").click()
+            # Click on "book icon"
+            driver.find_element(By.CLASS_NAME, 'fbt').click()
+            # Get Opening Name and tell it if it's 3rd move
+            if 1 < tot_moves < 10:
+                print(tot_moves)
+                # driver.find_element(By.CLASS_NAME,'message').click()
+                # Click on move tot_moves to get Opening name
+                move_xpath = f"//index[text()='{tot_moves}']/following-sibling::move"
+                print('ok found move number')
+                move_element = driver.find_element(By.XPATH, move_xpath)
+                move_element.click()
+                print('ok click on move number')
+                time.sleep(2)
+                title_element = driver.find_element(By.CLASS_NAME, "title")
+                title_text = title_element.get_attribute("title")
+                print('ok get title opening')
+                # Send message to Lichess Chat
+                message = f"We are playing this Opening: {title_text}"
+                client.bots.post_message(game_id, message, False)
+                run_telegram_bot.send_message_to_telegram(telegram_token, message)
+                # Go to last move
+                move_xpath = "//index[last()]/following-sibling::move[last()]"
+                move_element = driver.find_element(By.XPATH, move_xpath)
+                move_element.click()
+            # Click on Lichess players
+            time.sleep(1)
+            driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
+            # Open filter settings
+            driver.find_element(By.CLASS_NAME, 'toconf').click()
+            # Select only rapid and longer (de-select bullet and blitz)
+            driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
+            driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
+            # Select only >2200 elo
+            for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
+                driver.find_element(By.XPATH, f'//button[text()={i}]').click()
+            # Confirm
+            driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
+            # Find element <tr> with data-uci="move"
+            get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
+            # Find number playing
+            get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
+            # Find avg rating
+            avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
+            move = get_move.get_attribute('data-uci')
+            return move, get_num_played, avg_rating
+        except:
+            return 0, 0, 0
+    else:
         return 0, 0, 0
 
 
@@ -299,11 +304,12 @@ def evaluate_position_cp(fen):
             cp = int(cp)
         return cp
 
-def stockfish_best_move(fen, opponent_elo, opponent_name):
+def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
     """
     Stockfish analyzes position and finds the best move with its parameters based on opponent_elo
     :param fen: fen position
-    :param opponent_elo: elo of opponent
+    :param opponent_elo / opponent_name: elo and name of opponent
+    :param game_id: id of Lichess game
     :return: best move for that thinking time
     """
     global STOCKFISH_PATH
@@ -358,124 +364,137 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
 
     # Set the board position
     board = chess.Board(fen)
-    # Evaluate position CP to determine how the bot is playing (level, thinking time, hash memory, moves depth, threads)
-    cp = evaluate_position_cp(fen)
-    deep_time, skill_level, hash_m, depth, threads_m = get_level_time()
-    if cp > 800:
-        skill_level = 20
-    elif 400 < cp <= 600:
-        deep_time *= 0.5
-        skill_level -= 4
-        hash_m *= 0.7
-        depth *= 0.6
-        threads_m *= 0.7
-    elif 100 < cp <= 400:
-        deep_time *= 0.7
-        skill_level -= 3
-        hash_m *= 0.8
-        depth *= 0.8
-        threads_m *= 0.8
-    elif 50 < cp <= 100:
-        deep_time *= 0.8
-        skill_level -= 2
-        hash_m *= 0.9
-        depth *= 0.9
-        threads_m *= 0.9
-    elif 0 < cp <= 50:
-        deep_time *= 0.9
-        skill_level -= 1
-    elif cp == 0:
-        pass
-    elif -50 < cp < 0:
-        deep_time *= 1.1
-        skill_level += 1
-    elif -100 < cp <= 50:
-        deep_time *= 1.4
-        skill_level += 2
-        hash_m = hash_m * 1.05 + 50
-    elif -200 < cp <= -100:
-        deep_time *= 2
-        skill_level += 3
-        hash_m = hash_m * 1.1 + 100
-        threads_m *= 1.1
-    elif -400 < cp <= -200:
-        deep_time *= 4
-        skill_level += 5
-        hash_m = hash_m * 1.3 + 200
-        threads_m *= 1.2
-    elif cp < -400:
-        deep_time *= 7
-        skill_level = 20
-        hash_m = hash_m * 1.5 + 300
-        threads_m *= 1.4
-    if skill_level < 1:
-        skill_level = 1
-    elif skill_level > 20:
-        skill_level = 20
-    # Check if a shared global var Level is setted (to modify level from Telegram Bot)
-    set_level = load_global_db('level', 'global', 'get', 0)
-    if set_level <= 0 or set_level is None:
-        # Not setted
-        pass
-    elif set_level < 0:
-        skill_level = 1
-    elif set_level > 20:
-        skill_level = 20
-    else:
-        skill_level = set_level
-    # Check if shared global var Think is setted (to modify thinking time from Telegram Bot)
-    set_think = load_global_db('think', 'global', 'get', 0)
-    if set_think <= 0 or set_think is None:
-        # Not setted
-        pass
-    elif set_think >= 3600:
-        deep_time = 3600
-    else:
-        deep_time = set_think
-    # Check if shared global var Hash is setted (to modify hash memory from Telegram Bot)
-    set_hash = load_global_db('hash', 'global', 'get', 0)
-    if set_hash <= 0 or set_hash is None:
-        # Not setted
-        pass
-    elif set_hash >= 2100:
-        hash_m = 2100
-    else:
-        hash_m = set_hash
-    # Check if shared global var Depth is setted (to modify depth moves from Telegram Bot)
-    set_depth = load_global_db('depth', 'global', 'get', 0)
-    if set_depth <= 0 or set_depth is None:
-        # Not setted
-        pass
-    elif set_depth >= 30:
-        depth = 30
-    else:
-        depth = set_depth
-    # Check if shared global var Thread is setted (to modify threads from Telegram Bot)
-    set_thread = load_global_db('thread', 'global', 'get', 0)
-    if set_thread <= 0 or set_thread is None:
-        # Not setted
-        pass
-    elif set_thread >= 20:
-        threads_m = 20
-    else:
-        threads_m = set_thread
 
-    # Estimate Stockfish Elo strength
-    try:
-        elo_strength = (skill_level/20 + hash_m/2024 + depth/30 + threads_m/15 + deep_time/15) / 5 * 3200
-    except:
-        elo_strength = 2000
+    if game_id in hurry_list:
+        # Make Stockfish move faster, avoiding Telegram interaction, if the id has less than 2'
+        deep_time = 0
+        hash_m = 500
+        threads_m = 10
+        depth = 5
+        skill_level = 20
+        elo_strength = (skill_level/20 + hash_m/2024 + depth/25 + threads_m/12 + deep_time/10) / 5 * 3200
+    else:
+        # Standard use. Evaluate position CP to determine Stockfish strength
+        cp = evaluate_position_cp(fen)
+        deep_time, skill_level, hash_m, depth, threads_m = get_level_time()
+        if cp > 800:
+            skill_level = 20
+        elif 400 < cp <= 600:
+            deep_time *= 0.5
+            skill_level -= 4
+            hash_m *= 0.7
+            depth *= 0.6
+            threads_m *= 0.7
+        elif 100 < cp <= 400:
+            deep_time *= 0.7
+            skill_level -= 3
+            hash_m *= 0.8
+            depth *= 0.8
+            threads_m *= 0.8
+        elif 50 < cp <= 100:
+            deep_time *= 0.8
+            skill_level -= 2
+            hash_m *= 0.9
+            depth *= 0.9
+            threads_m *= 0.9
+        elif 0 < cp <= 50:
+            deep_time *= 0.9
+            skill_level -= 1
+        elif cp == 0:
+            pass
+        elif -50 < cp < 0:
+            deep_time *= 1.1
+            skill_level += 1
+        elif -100 < cp <= 50:
+            deep_time *= 1.4
+            skill_level += 2
+            hash_m = hash_m * 1.05 + 50
+        elif -200 < cp <= -100:
+            deep_time *= 2
+            skill_level += 3
+            hash_m = hash_m * 1.1 + 100
+            threads_m *= 1.1
+        elif -400 < cp <= -200:
+            deep_time *= 4
+            skill_level += 5
+            hash_m = hash_m * 1.3 + 200
+            threads_m *= 1.2
+        elif cp < -400:
+            deep_time *= 7
+            skill_level = 20
+            hash_m = hash_m * 1.5 + 300
+            threads_m *= 1.4
+        if skill_level < 1:
+            skill_level = 1
+        elif skill_level > 20:
+            skill_level = 20
+        if threads_m >= 12:
+            threads_m = 12
+        # Check if a shared global var Level is setted (to modify level from Telegram Bot)
+        set_level = load_global_db('level', 'global', 'get', 0)
+        if set_level <= 0 or set_level is None:
+            # Not setted
+            pass
+        elif set_level < 0:
+            skill_level = 1
+        elif set_level > 20:
+            skill_level = 20
+        else:
+            skill_level = set_level
+        # Check if shared global var Think is setted (to modify thinking time from Telegram Bot)
+        set_think = load_global_db('think', 'global', 'get', 0)
+        if set_think <= 0 or set_think is None:
+            # Not setted
+            pass
+        elif set_think >= 3600:
+            deep_time = 3600
+        else:
+            deep_time = set_think
+        # Check if shared global var Hash is setted (to modify hash memory from Telegram Bot)
+        set_hash = load_global_db('hash', 'global', 'get', 0)
+        if set_hash <= 0 or set_hash is None:
+            # Not setted
+            pass
+        elif set_hash >= 5100:
+            hash_m = 5100
+        else:
+            hash_m = set_hash
+        # Check if shared global var Depth is setted (to modify depth moves from Telegram Bot)
+        set_depth = load_global_db('depth', 'global', 'get', 0)
+        if set_depth <= 0 or set_depth is None:
+            # Not setted
+            pass
+        elif set_depth >= 50:
+            depth = 50
+        else:
+            depth = set_depth
+        # Check if shared global var Thread is setted (to modify threads from Telegram Bot)
+        set_thread = load_global_db('thread', 'global', 'get', 0)
+        if set_thread <= 0 or set_thread is None:
+            # Not setted
+            pass
+        elif set_thread >= 12:
+            threads_m = 12
+        else:
+            threads_m = set_thread
 
-    # Send message to Telegram Bot
-    send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
-                    f"CP evaluation: {cp // 100}\n"
-                    f"Playing at level: {skill_level}\n"
-                    f"Thinking time: {round(deep_time, 1)}s\n"
-                    f"Hash Memory: {round(hash_m)}Mb\n"
-                    f"Moves Depth: {round(depth)}\n"
-                    f"Threads Num: {round(threads_m)}\n"
-                    f"Playing at: {round(elo_strength)} Elo")
-    run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
+        # Estimate Stockfish Elo strength
+        try:
+            elo_strength = (skill_level/20 + hash_m/5000 + depth/30 + threads_m/12 + deep_time/20) / 5 * 3200
+        except:
+            elo_strength = 2000
+
+        # Send message to Telegram Bot
+        send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
+                        f"CP evaluation: {cp // 100}\n"
+                        f"Playing at level: {skill_level}\n"
+                        f"Thinking time: {round(deep_time, 1)}s\n"
+                        f"Hash Memory: {round(hash_m)}Mb\n"
+                        f"Moves Depth: {round(depth)}\n"
+                        f"Threads Num: {round(threads_m)}\n"
+                        f"Playing at: {round(elo_strength)} Elo")
+        run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
+
     with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
         # Set hash size (in MB)
         engine.configure({"Hash": hash_m})
@@ -494,7 +513,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     :param fen: the fen position, to pass to read_fen_database to extract move
     :param elo_opponent: opponent Lichess elo
     """
-    global bot_thinking
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
     for event in client.bots.stream_game_state(game_id):
@@ -540,14 +558,12 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
             else:
                 # Use Stockfish 17 to find best move
-                next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name)
+                next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name, game_id)
                 client.bots.make_move(game_id, next_move.uci())
                 chess_board.push(next_move)
                 print(f'I moved from Stockfish at {elo_strength} Elo')
                 send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
                 client.bots.post_message(game_id, send_message, False)
-            # Set bot_thinking to 0 so that While iteration can continue
-            bot_thinking = 0
             return
 
         except Exception as e:
@@ -559,51 +575,97 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             print('Invalid move.. i moved random')
             tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
             run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + f'I moved random as {e}')
-            bot_thinking = 0
             return
+
+
+def handle_single_event(game_id):
+    """
+    Handle only one event, in another Thread, for game(s) with less than 2'
+    """
+    countdown = 0
+    try:
+        while True:
+            # If countdown is >= 1000 then close this function and thread
+            countdown += 1
+            if countdown >= 1000:
+                hurry_list.remove(game_id)
+                return
+            # Stream every game but focus only on the game with < 2 min (game_id)
+            events = client.games.get_ongoing()
+            for event in events:
+                is_bot_turn = event['isMyTurn']
+                all_game_id = event['gameId']
+                if all_game_id == game_id and is_bot_turn:
+                    # This means the thread is still active
+                    countdown -= 1
+                    # If first move send welcome message
+                    if event['hasMoved'] == False:
+                        ai_send_message = random_chat()
+                        client.bots.post_message(game_id, ai_send_message, False)
+                    fen = event['fen']
+                    elo_opponent = event['opponent']['rating']
+                    opponent_name = event['opponent']['username']
+                    print('My turn')
+                    handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
+    except berserk.exceptions.ResponseError as e:
+        print(f"Rate limit exceeded: {e}. Waiting before retrying...")
+        tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
+        run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
+        time.sleep(10)  # Wait for 90 seconds before retrying
+        handle_events()  # Restart the event handling after the wait
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        tg_message = f"Unexpected error: {e}"
+        run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
+        time.sleep(10)  # Wait for 10 seconds before retrying
+        handle_events()  # Restart the event handling after the wait
 
 
 def handle_events():
     """
     Most important function. Loops each active game on Lichess and handle moves and threads
     """
-    global bot_thinking
     counter_challenge = 0
     try:
         while True:
-            # Process only if Stockfish isn't thinking a move
-            if bot_thinking == 0:
-                counter_challenge += 1
+            counter_challenge += 1
 
-                set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
-                if set_challenge_loops < 100:
-                    challenge_loops = 2000
-                else:
-                    challenge_loops = set_challenge_loops
-                print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
-                if counter_challenge > challenge_loops:
-                    counter_challenge = 0
-                    send_challenge()
+            set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
+            if set_challenge_loops < 100:
+                challenge_loops = 2000
+            else:
+                challenge_loops = set_challenge_loops
+            print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
+            if counter_challenge > challenge_loops:
+                counter_challenge = 0
+                send_challenge()
 
-                # Check challenges
-                if challenge_loops % 5 == 0:
-                    check_challenges()
+            # Check challenges
+            if challenge_loops % 5 == 0:
+                check_challenges()
+                pass
 
-                # Get number of active games
-                ongoing_games = client.games.get_ongoing()
-                list_games_id = [game['gameId'] for game in ongoing_games]
+            # Stream every games
+            events = client.games.get_ongoing()
+            for event in events:
+                is_bot_turn = event['isMyTurn']
+                game_id = event['gameId']
 
-                # Stream every games
-                events = client.games.get_ongoing()
-                for event in events:
-                    is_bot_turn = event['isMyTurn']
-                    game_id = event['gameId']
-                    print(game_id)
+                try:
+                    if event['secondsLeft'] <= 120 and is_bot_turn and game_id not in hurry_list:
+                        # If game has < 2' secondsLeft create a thread just for it
+                        thread = threading.Thread(target=handle_single_event, args=(game_id,))
+                        thread.start()
+                        hurry_list.append(game_id)
+                        continue
+                except:
+                    pass
 
-                    # Check if it's Bot Turn
+                print(game_id)
+
+                # Check if it's Bot Turn and if it's not in the other Thread
+                if game_id not in hurry_list:
                     if is_bot_turn:
-                        # Set bot_thinking to 1 in order to stop While iteration
-                        bot_thinking = 1
                         # If first move send welcome message
                         if event['hasMoved'] == False:
                             ai_send_message = random_chat()
@@ -618,14 +680,12 @@ def handle_events():
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 90 seconds before retrying
         handle_events()  # Restart the event handling after the wait
     except Exception as e:
         print(f"Unexpected error: {e}")
         tg_message = f"Unexpected error: {e}"
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
 
