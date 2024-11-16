@@ -5,7 +5,8 @@ Now bot can find Opening name and human moves, plus its 10x faster!
 Telegram Bot to access Lichess Bot results real time!
 Ollama chatbot to interact with users (work in progress)
 
-## Massive Update [19/10/2024]
+## Important Updates
+-Now bot can play variants, using Fairy-Stockfish! 
 -Now bot can play even blitz or bullets if you want, improved the API calls to make it 10x faster!
 -Now bot can find Opening name and human moves (if the game follows real Lichess games)
 

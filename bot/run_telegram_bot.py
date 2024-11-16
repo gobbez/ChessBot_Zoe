@@ -56,38 +56,34 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 return df_global['Challenge_Increment'][0]
             elif search_for == 'challenge_opp_elo' and len(df_global) == 1:
                 return df_global['Challenge_Opponent_Elo'][0]
+            elif search_for == 'challenge_variant' and len(df_global) == 1:
+                return df_global['Challenge_Variant'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
                 df_global.loc[df_global['Game'] == game_for, 'Level'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'think':
                 df_global.loc[df_global['Game'] == game_for, 'Think'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'hash':
                 df_global.loc[df_global['Game'] == game_for, 'Hash'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'depth':
                 df_global.loc[df_global['Game'] == game_for, 'Depth'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'thread':
                 df_global.loc[df_global['Game'] == game_for, 'Thread'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_loops':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Loops'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_time':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Time'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_increment':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Increment'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_opp_elo':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Opponent_Elo'] = add_value
-                df_global.to_csv(global_csv)
+            elif search_for == 'challenge_variant':
+                df_global.loc[df_global['Game'] == game_for, 'Challenge_Variant'] = add_value
+            # Save csv
+            df_global.to_csv(global_csv)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -180,26 +176,42 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 load_global_db('wait_api', 'global', 'set', set_wait)
                 value_setted = load_global_db('wait_api', 'global', 'get', 0)
                 await update.message.reply_text(f"Wait Api setted: {value_setted}s")
+
+            # Challenges
+            # Challenge Loops
             elif text_received.startswith('challenge_loops'):
                 set_challenge_loops = int(text_received[15:])
                 load_global_db('challenge_loops', 'global', 'set', set_challenge_loops)
                 value_setted = load_global_db('challenge_loops', 'global', 'get', 0)
                 await update.message.reply_text(f"Challenge loops: {value_setted}")
+            # Challenge time
             elif text_received.startswith('challenge_time'):
                 set_challenge_time = int(text_received[14:])
                 load_global_db('challenge_time', 'global', 'set', set_challenge_time)
                 value_setted = load_global_db('challenge_time', 'global', 'get', 0)
                 await update.message.reply_text(f"Challenge time: {value_setted}s")
+            # Challenge increment
             elif text_received.startswith('challenge_increment'):
                 set_challenge_inc = int(text_received[19:])
                 load_global_db('challenge_increment', 'global', 'set', set_challenge_inc)
                 value_setted = load_global_db('challenge_increment', 'global', 'get', 0)
                 await update.message.reply_text(f"Challenge increment: {value_setted}s")
+            # Challenge opponent elo
             elif text_received.startswith('challenge_opp_elo'):
                 set_challenge_oppelo = int(text_received[17:])
                 load_global_db('challenge_opp_elo', 'global', 'set', set_challenge_oppelo)
                 value_setted = load_global_db('challenge_opp_elo', 'global', 'get', 0)
                 await update.message.reply_text(f"Challenge Opponent Elo > {round(value_setted)}")
+            # Challenge variant
+            elif text_received.startswith('challenge_variant'):
+                set_challenge_variant = text_received[17:]
+                if set_challenge_variant in ["standard", "chess960", "crazyhouse", "antichess", "atomic", "horde",
+                                             "kingOfTheHill", "racingKings", "threeCheck", "fromPosition"]:
+                    load_global_db('challenge_variant', 'global', 'set', set_challenge_variant)
+                    value_setted = load_global_db('challenge_variant', 'global', 'get', 0)
+                    await update.message.reply_text(f"Challenge Variant: {value_setted}")
+                else:
+                    await update.message.reply_text("Wrong variant name..")
     except:
         await update.message.reply_text("Wrong value for setting..")
 
@@ -218,6 +230,3 @@ def activate_bot():
 
     print('Bot Telegram activated..')
     application.run_polling()
-
-
-

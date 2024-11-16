@@ -1,2 +1,2 @@
-,Unnamed: 0.2,Unnamed: 0.1,Unnamed: 0,Game,Level,Think,Hash,Depth,Thread,Wait_Api,Challenge_Loops,Challenge_Time,Challenge_Increment,Challenge_Opponent_Elo
-0,0,0,0,global,0,0,0,0,0,0,100,1800,30,2300
+Game,Level,Think,Hash,Depth,Thread,Wait_Api,Challenge_Loops,Challenge_Time,Challenge_Increment,Challenge_Opponent_Elo,Challenge_variant
+global,0,0,0,0,0,0,0,0,0,3000,standard

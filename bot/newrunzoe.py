@@ -4,16 +4,13 @@ import yaml
 import chess
 import chess.engine
 import chess.pgn
+import chess.variant
 import random
 import pandas as pd
 import threading
 import time
 from pathlib import Path
-import ollama
 import sys
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 import platform
 
 import run_telegram_bot
@@ -25,12 +22,12 @@ THIS_FOLDER = Path(__file__).parent.resolve()
 # Path of Stockfish binary (try both Windows and Linux Paths)
 if platform.system() == 'Windows':
     STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
+    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "stockfish/Fairy/Windows/fairy-stockfish-largeboard_x86-64-bmi2.exe"
 else:
     STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-ubuntu-x86-64-avx2"
+    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "stockfish/Fairy/Linux/fairy-stockfish-largeboard_x86-64-bmi2"
 
 config_path = THIS_FOLDER / "config.yml"
-# Opening Books
-king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
 # Ollama chat
 df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
 
@@ -97,38 +94,34 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 return df_global['Challenge_Increment'][0]
             elif search_for == 'challenge_opp_elo' and len(df_global) == 1:
                 return df_global['Challenge_Opponent_Elo'][0]
+            elif search_for == 'challenge_variant' and len(df_global) == 1:
+                return df_global['Challenge_Variant'][0]
     elif action == 'set':
         if game_for == 'global':
             if search_for == 'level':
                 df_global.loc[df_global['Game'] == game_for, 'Level'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'think':
                 df_global.loc[df_global['Game'] == game_for, 'Think'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'hash':
                 df_global.loc[df_global['Game'] == game_for, 'Hash'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'depth':
                 df_global.loc[df_global['Game'] == game_for, 'Depth'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'thread':
                 df_global.loc[df_global['Game'] == game_for, 'Thread'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'wait_api':
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_loops':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Loops'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_time':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Time'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_increment':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Increment'] = add_value
-                df_global.to_csv(global_csv)
             elif search_for == 'challenge_opp_elo':
                 df_global.loc[df_global['Game'] == game_for, 'Challenge_Opponent_Elo'] = add_value
-                df_global.to_csv(global_csv)
+            elif search_for == 'challenge_variant':
+                df_global.loc[df_global['Game'] == game_for, 'Challenge_Variant'] = add_value
+            # Save csv
+            df_global.to_csv(global_csv)
 
 
 def random_chat():
@@ -167,6 +160,7 @@ def send_challenge():
             set_challenge_time = int(load_global_db('challenge_time', 'global', 'get', 0))
             set_challenge_increment = int(load_global_db('challenge_increment', 'global', 'get', 0))
             set_challenge_oppelo = int(load_global_db('challenge_opp_elo', 'global', 'get', 0))
+            set_challenge_variant = load_global_db('challenge_variant', 'global', 'get', 0)
             if set_challenge_time < 180:
                 challenge_time = 900
             else:
@@ -193,7 +187,8 @@ def send_challenge():
                 client.challenges.create(username=rand_bot,
                                          rated=True,
                                          clock_limit=challenge_time,
-                                         clock_increment=challenge_increment)
+                                         clock_increment=challenge_increment,
+                                         variant=set_challenge_variant)
                 message = f'Challenging: {rand_bot}'
                 print(message)
                 run_telegram_bot.send_message_to_telegram(telegram_token, message)
@@ -205,96 +200,43 @@ def send_challenge():
             try_challenge += 1
 
 
-# Lichess Analysis Move
-def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
-    """
-    Connects to Lichess Analysis Board, filters for >2500 Lichess users and play the most played move
-    :param fen: fen position
-    :param game_pgn: pgn of game
-    :param tot_moves: total numbers played in the game
-    :param game_id: id of the game
-    :return: the most played move (if any), number of times that move is played, avg_rating of played moves
-    """
-    # Use Lichess only if game has more than 2'
-    if game_id not in hurry_list:
-        # Set up Chrome options for headless browsing
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        # Initialize the driver with the specified options
-        driver = webdriver.Chrome(options=chrome_options)
-        # Go to Analysis Board
-        link = f'https://lichess.org/analysis'
-        driver.get(link)
-        try:
-            # Write PGN in Lichess Analysis
-            game_pgn = str(game_pgn)
-            write_pgn = driver.find_element(By.CSS_SELECTOR, "textarea.copyable")
-            write_pgn.click()
-            write_pgn.send_keys(game_pgn)
-            driver.find_element(By.CSS_SELECTOR,"button.button.button-thin.bottom-item.bottom-action.text[data-icon='']").click()
-            # Click on "book icon"
-            driver.find_element(By.CLASS_NAME, 'fbt').click()
-            # Get Opening Name and tell it if it's 3rd move
-            if 1 < tot_moves < 10:
-                print(tot_moves)
-                # driver.find_element(By.CLASS_NAME,'message').click()
-                # Click on move tot_moves to get Opening name
-                move_xpath = f"//index[text()='{tot_moves}']/following-sibling::move"
-                print('ok found move number')
-                move_element = driver.find_element(By.XPATH, move_xpath)
-                move_element.click()
-                print('ok click on move number')
-                time.sleep(2)
-                title_element = driver.find_element(By.CLASS_NAME, "title")
-                title_text = title_element.get_attribute("title")
-                print('ok get title opening')
-                # Send message to Lichess Chat
-                message = f"We are playing this Opening: {title_text}"
-                client.bots.post_message(game_id, message, False)
-                run_telegram_bot.send_message_to_telegram(telegram_token, message)
-                # Go to last move
-                move_xpath = "//index[last()]/following-sibling::move[last()]"
-                move_element = driver.find_element(By.XPATH, move_xpath)
-                move_element.click()
-            # Click on Lichess players
-            time.sleep(1)
-            driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
-            # Open filter settings
-            driver.find_element(By.CLASS_NAME, 'toconf').click()
-            # Select only rapid and longer (de-select bullet and blitz)
-            driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
-            driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
-            # Select only >2200 elo
-            for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
-                driver.find_element(By.XPATH, f'//button[text()={i}]').click()
-            # Confirm
-            driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
-            # Find element <tr> with data-uci="move"
-            get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
-            # Find number playing
-            get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
-            # Find avg rating
-            avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
-            move = get_move.get_attribute('data-uci')
-            return move, get_num_played, avg_rating
-        except:
-            return 0, 0, 0
-    else:
-        return 0, 0, 0
-
-
 # STOCKFISH FUNCTIONS
-def evaluate_position_cp(fen):
+def evaluate_position_cp(fen, variant):
     """
     Analyze the position and returns CP value (int)
     :param fen: fen position
+    :param variant: type of chess variant (normal is "standard")
     :return: CP value (int)
     """
-    global STOCKFISH_PATH
-    board = chess.Board(fen)
-    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+    global STOCKFISH_PATH, FAIRY_STOCKFISH_PATH
+
+    # Use Stockfish for standard games and Fairy Stockfish for variants, set boards for each
+    if variant == 'standard' or variant == 'chess960' or variant == 'fromPosition':
+        path = STOCKFISH_PATH
+        board = chess.Board(fen)
+    elif variant == 'crazyhouse':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.CrazyhouseBoard(fen)
+    elif variant == 'antichess':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.AntichessBoard(fen)
+    elif variant == 'atomic':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.AtomicBoard(fen)
+    elif variant == 'horde':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.HordeBoard(fen)
+    elif variant == 'kingOfTheHill':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.KingOfTheHillBoard(fen)
+    elif variant == 'racingKings':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.RacingKingsBoard(fen)
+    elif variant == 'threeCheck':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.ThreeCheckBoard(fen)
+
+    with chess.engine.SimpleEngine.popen_uci(path) as engine:
         info = engine.analyse(board, chess.engine.Limit(time=2.0))
         cp = str(info['score'].relative)
         if "#" in cp:
@@ -304,15 +246,17 @@ def evaluate_position_cp(fen):
             cp = int(cp)
         return cp
 
-def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
+
+def stockfish_best_move(fen, opponent_elo, opponent_name, game_id, variant):
     """
     Stockfish analyzes position and finds the best move with its parameters based on opponent_elo
     :param fen: fen position
     :param opponent_elo / opponent_name: elo and name of opponent
     :param game_id: id of Lichess game
+    :param variant: type of chess variant (normal is "standard")
     :return: best move for that thinking time
     """
-    global STOCKFISH_PATH
+    global STOCKFISH_PATH, FAIRY_STOCKFISH_PATH
 
     def get_level_time():
         """
@@ -362,8 +306,31 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
             threads_m = 18
         return deep_time, skill_level, hash_m, depth, threads_m
 
-    # Set the board position
-    board = chess.Board(fen)
+    # Use Stockfish for standard games and Fairy Stockfish for variants, set boards for each
+    if variant == 'standard' or variant == 'chess960' or variant == 'fromPosition':
+        path = STOCKFISH_PATH
+        board = chess.Board(fen)
+    elif variant == 'crazyhouse':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.CrazyhouseBoard(fen)
+    elif variant == 'antichess':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.AntichessBoard(fen)
+    elif variant == 'atomic':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.AtomicBoard(fen)
+    elif variant == 'horde':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.HordeBoard(fen)
+    elif variant == 'kingOfTheHill':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.KingOfTheHillBoard(fen)
+    elif variant == 'racingKings':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.RacingKingsBoard(fen)
+    elif variant == 'threeCheck':
+        path = FAIRY_STOCKFISH_PATH
+        board = chess.variant.ThreeCheckBoard(fen)
 
     if game_id in hurry_list:
         # Make Stockfish move faster, avoiding Telegram interaction, if the id has less than 2'
@@ -375,7 +342,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
         elo_strength = (skill_level/20 + hash_m/2024 + depth/25 + threads_m/12 + deep_time/10) / 5 * 3200
     else:
         # Standard use. Evaluate position CP to determine Stockfish strength
-        cp = evaluate_position_cp(fen)
+        cp = evaluate_position_cp(fen, variant)
         deep_time, skill_level, hash_m, depth, threads_m = get_level_time()
         if cp > 800:
             skill_level = 20
@@ -480,7 +447,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
 
         # Estimate Stockfish Elo strength
         try:
-            elo_strength = (skill_level/20 + hash_m/5000 + depth/30 + threads_m/12 + deep_time/20) / 5 * 3200
+            elo_strength = (skill_level/20 + hash_m/3000 + depth/30 + threads_m/12 + deep_time/20) / 5 * 3200
         except:
             elo_strength = 2000
 
@@ -492,10 +459,11 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
                         f"Hash Memory: {round(hash_m)}Mb\n"
                         f"Moves Depth: {round(depth)}\n"
                         f"Threads Num: {round(threads_m)}\n"
-                        f"Playing at: {round(elo_strength)} Elo")
+                        f"Playing at: {round(elo_strength)} Elo\n"
+                        f"Variant: {variant}")
         run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
 
-    with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
+    with chess.engine.SimpleEngine.popen_uci(path) as engine:
         # Set hash size (in MB)
         engine.configure({"Hash": hash_m})
         # Set the number of threads
@@ -506,64 +474,47 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
     return result.move, round(elo_strength)
 
 
-def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
+def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name, variant):
     """
     This function handles the moves on Lichess and saves moves.
     :param game_id: the game id that the bot is currently playing
     :param fen: the fen position, to pass to read_fen_database to extract move
     :param elo_opponent: opponent Lichess elo
     """
-    chess_board = chess.Board()
-    move_number = 1  # Initialize move number
+    # Set boards for variants or normal ("standard")
+    # Use Stockfish for standard games and Fairy Stockfish for variants, set boards for each
+    if variant == 'standard' or variant == 'chess960' or variant == 'fromPosition':
+        chess_board = chess.Board(fen)
+    elif variant == 'crazyhouse':
+        chess_board = chess.variant.CrazyhouseBoard(fen)
+    elif variant == 'antichess':
+        chess_board = chess.variant.AntichessBoard(fen)
+    elif variant == 'atomic':
+        chess_board = chess.variant.AtomicBoard(fen)
+    elif variant == 'horde':
+        chess_board = chess.variant.HordeBoard(fen)
+    elif variant == 'kingOfTheHill':
+        chess_board = chess.variant.KingOfTheHillBoard(fen)
+    elif variant == 'racingKings':
+        chess_board = chess.variant.RacingKingsBoard(fen)
+    elif variant == 'threeCheck':
+        chess_board = chess.variant.ThreeCheckBoard(fen)
+
     for event in client.bots.stream_game_state(game_id):
         try:
             print(f"Playing: {event['id']}")
         except:
             print('Impredictable error..')
             return
-        if 'state' not in event:
-            continue  # Skip this event if it doesn't contain the 'state' key
-        # Update the chess board with all moves
-        moves = event['state']['moves'].split()
-        tot_moves = len(moves)//2
-        # Create PGN
-        game_pgn = chess.pgn.Game()
-        game_pgn.headers["Event"] = f"VS {opponent_name}"
-        node = game_pgn
-        # Add moves to chessboard and PGN
-        for move in moves:
-            uci_move = chess.Move.from_uci(move)
-            if uci_move in chess_board.legal_moves:
-                chess_board.push(uci_move)
-                node = node.add_variation(uci_move)
-            else:
-                print(f"Move {move} is not legal at the current board state.")
 
         try:
-            # Use Lichess Analysis to find the most played human move and get Opening Name
-            next_move, get_number_played, avg_rating = lichess_analysis_move(fen, game_pgn, tot_moves, game_id)
-            if next_move != 0:
-                # Move the most played move from Lichess Analysis Board
-                client.bots.make_move(game_id, next_move)
-                chess_board.push_uci(next_move)
-                print('I moved from Lichess Analysis Board')
-                # Get avg_elo correctly
-                if avg_rating[-4].startswith(('1', '2', '3')):
-                    avg_rating = avg_rating[-4:]
-                elif avg_rating[-3].startswith(('1', '2', '3')):
-                    avg_rating = avg_rating[-3:]
-                send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
-                client.bots.post_message(game_id, send_message, False)
-                tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
-                run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
-            else:
-                # Use Stockfish 17 to find best move
-                next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name, game_id)
-                client.bots.make_move(game_id, next_move.uci())
-                chess_board.push(next_move)
-                print(f'I moved from Stockfish at {elo_strength} Elo')
-                send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
-                client.bots.post_message(game_id, send_message, False)
+            # Use Stockfish 17 to find best move
+            next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name, game_id, variant)
+            client.bots.make_move(game_id, next_move.uci())
+            chess_board.push(next_move)
+            print(f'I moved from Stockfish at {elo_strength} Elo')
+            send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
+            client.bots.post_message(game_id, send_message, False)
             return
 
         except Exception as e:
@@ -578,7 +529,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             return
 
 
-def handle_single_event(game_id):
+def handle_single_event(game_id, variant):
     """
     Handle only one event, in another Thread, for game(s) with less than 2'
     """
@@ -606,7 +557,7 @@ def handle_single_event(game_id):
                     elo_opponent = event['opponent']['rating']
                     opponent_name = event['opponent']['username']
                     print('My turn')
-                    handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
+                    handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name, variant)
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
@@ -650,11 +601,12 @@ def handle_events():
             for event in events:
                 is_bot_turn = event['isMyTurn']
                 game_id = event['gameId']
+                variant = event['variant']['key']
 
                 try:
                     if event['secondsLeft'] <= 120 and is_bot_turn and game_id not in hurry_list:
                         # If game has < 2' secondsLeft create a thread just for it
-                        thread = threading.Thread(target=handle_single_event, args=(game_id,))
+                        thread = threading.Thread(target=handle_single_event, args=(game_id, variant))
                         thread.start()
                         hurry_list.append(game_id)
                         continue
@@ -674,7 +626,7 @@ def handle_events():
                         elo_opponent = event['opponent']['rating']
                         opponent_name = event['opponent']['username']
                         print('My turn')
-                        handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
+                        handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name, variant)
 
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
@@ -703,18 +655,28 @@ def check_challenges():
         except:
             challenge_cadence = challenge['timeControl']['type']
         challenge_id = challenge['id']
-        print(challenge_cadence)
-        print(challenge['timeControl']['type'])
+        variant = challenge['variant']['key']
+
         try:
-            if challenge_cadence == 'correspondence' and challenge['timeControl']['type'] != 'unlimited':
-                client.bots.accept_challenge(challenge_id)
-                print(f"New Challenger: {challenger} on {challenge_cadence}")
-            elif (challenge['timeControl']['limit'] >= 900 and challenge['timeControl']['increment'] >= 14) or \
-                    challenge['speed'] == 'standard':
-                client.bots.accept_challenge(challenge_id)
-                print(f"New Challenger: {challenger} on {challenge_cadence}")
+            if variant == 'standard':
+                # Challenge standard
+                if challenge_cadence == 'correspondence' and challenge['timeControl']['type'] != 'unlimited':
+                    client.bots.accept_challenge(challenge_id)
+                    print(f"New Challenger: {challenger} on {challenge_cadence}")
+                elif (challenge['timeControl']['limit'] >= 900 and challenge['timeControl']['increment'] >= 14) or \
+                        challenge['speed'] == 'standard':
+                    client.bots.accept_challenge(challenge_id)
+                    print(f"New Challenger: {challenger} on {challenge_cadence}")
+                else:
+                    client.bots.decline_challenge(challenge_id=challenge_id, reason='tooFast')
             else:
-                client.bots.decline_challenge(challenge_id=challenge_id, reason='tooFast')
+                # Challenge variants
+                if challenge['timeControl']['limit'] >= 120 and challenge['timeControl']['type'] != 'unlimited':
+                    client.bots.accept_challenge(challenge_id)
+                    print(f"New Challenger: {challenger} on {challenge_cadence}")
+                else:
+                    client.bots.decline_challenge(challenge_id=challenge_id, reason='generic')
+
         except:
             client.bots.decline_challenge(challenge_id=challenge_id, reason='later')
 
