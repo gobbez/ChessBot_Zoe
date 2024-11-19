@@ -334,10 +334,10 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id, variant):
 
     if game_id in hurry_list:
         # Make Stockfish move faster, avoiding Telegram interaction, if the id has less than 2'
-        deep_time = 0
-        hash_m = 500
+        deep_time = 2
+        hash_m = 2000
         threads_m = 10
-        depth = 5
+        depth = 15
         skill_level = 20
         elo_strength = (skill_level/20 + hash_m/2024 + depth/25 + threads_m/12 + deep_time/10) / 5 * 3200
     else:
