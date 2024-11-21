@@ -334,12 +334,12 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id, variant):
 
     if game_id in hurry_list:
         # Make Stockfish move faster, avoiding Telegram interaction, if the id has less than 2'
-        deep_time = 2
+        deep_time = 1
         hash_m = 2000
-        threads_m = 10
+        threads_m = 12
         depth = 15
         skill_level = 20
-        elo_strength = (skill_level/20 + hash_m/2024 + depth/25 + threads_m/12 + deep_time/10) / 5 * 3200
+        elo_strength = (skill_level/20 + hash_m/3000 + depth/30 + threads_m/12 + deep_time/20) / 5 * 3200
     else:
         # Standard use. Evaluate position CP to determine Stockfish strength
         cp = evaluate_position_cp(fen, variant)
@@ -539,8 +539,9 @@ def handle_single_event(game_id, variant):
             # If countdown is >= 1000 then close this function and thread
             countdown += 1
             if countdown >= 1000:
+                # Remove the id from the list and return 10 (thread is over)
                 hurry_list.remove(game_id)
-                return
+                return 10
             # Stream every game but focus only on the game with < 2 min (game_id)
             events = client.games.get_ongoing()
             for event in events:
@@ -562,14 +563,14 @@ def handle_single_event(game_id, variant):
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        time.sleep(10)  # Wait for 90 seconds before retrying
-        handle_events()  # Restart the event handling after the wait
+        hurry_list.remove(game_id)
+        return 10
     except Exception as e:
         print(f"Unexpected error: {e}")
         tg_message = f"Unexpected error: {e}"
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        time.sleep(10)  # Wait for 10 seconds before retrying
-        handle_events()  # Restart the event handling after the wait
+        hurry_list.remove(game_id)
+        return 10
 
 
 def handle_events():
@@ -607,6 +608,9 @@ def handle_events():
                     if event['secondsLeft'] <= 120 and is_bot_turn and game_id not in hurry_list:
                         # If game has < 2' secondsLeft create a thread just for it
                         thread = threading.Thread(target=handle_single_event, args=(game_id, variant))
+                        if thread == 10:
+                            # 10 means the function in the thread is finished, so it can close this session
+                            break
                         thread.start()
                         hurry_list.append(game_id)
                         continue
