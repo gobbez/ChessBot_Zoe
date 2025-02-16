@@ -21,15 +21,15 @@ sys.setrecursionlimit(100000)
 THIS_FOLDER = Path(__file__).parent.resolve()
 # Path of Stockfish binary (try both Windows and Linux Paths)
 if platform.system() == 'Windows':
-    STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
-    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "stockfish/Fairy/Windows/fairy-stockfish-largeboard_x86-64-bmi2.exe"
+    STOCKFISH_PATH = THIS_FOLDER / "../stockfish/stockfish-windows-x86-64-avx2.exe"
+    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "../stockfish/Fairy/Windows/fairy-stockfish-largeboard_x86-64-bmi2.exe"
 else:
-    STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-ubuntu-x86-64-avx2"
-    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "stockfish/Fairy/Linux/fairy-stockfish-largeboard_x86-64-bmi2"
+    STOCKFISH_PATH = THIS_FOLDER / "../stockfish/stockfish-ubuntu-x86-64-avx2"
+    FAIRY_STOCKFISH_PATH = THIS_FOLDER / "../stockfish/Fairy/Linux/fairy-stockfish-largeboard_x86-64-bmi2"
 
 config_path = THIS_FOLDER / "config.yml"
 # Ollama chat
-df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
+df_chat = pd.read_csv(THIS_FOLDER / "../database/AIChat.csv")
 
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
@@ -69,7 +69,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    global_csv = THIS_FOLDER / "database/Settings.csv"
+    global_csv = THIS_FOLDER / "../database/Settings.csv"
     df_global = pd.read_csv(global_csv)
     if action == 'get':
         if game_for == 'global':
@@ -667,7 +667,7 @@ def check_challenges():
                 if challenge_cadence == 'correspondence' and challenge['timeControl']['type'] != 'unlimited':
                     client.bots.accept_challenge(challenge_id)
                     print(f"New Challenger: {challenger} on {challenge_cadence}")
-                elif (challenge['timeControl']['limit'] >= 900 and challenge['timeControl']['increment'] >= 14) or \
+                elif (challenge['timeControl']['limit'] >= 60 and challenge['timeControl']['increment'] >= 0) or \
                         challenge['speed'] == 'standard':
                     client.bots.accept_challenge(challenge_id)
                     print(f"New Challenger: {challenger} on {challenge_cadence}")
