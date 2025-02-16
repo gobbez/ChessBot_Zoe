@@ -5,6 +5,22 @@ Now bot can find Opening name and human moves, plus its 10x faster!
 Telegram Bot to access Lichess Bot results real time!
 Ollama chatbot to interact with users (work in progress)
 
+## 🔗 INSTALLATION AND USAGE
+Clone the repo
+```bash
+git clone https://github.com/gobbez/ChessBot_Zoe.git
+```
+Create a config.yml file with:
+<ul>
+  <li>token: "YOUR LICHESS BOT API TOKEN"</li>
+  <li>challenges_token: "YOUR LICHESS CHALLENGES API TOKEN"</li>
+  <li> engine: 
+  <li>dir: "Stockfish path"</li>
+  <li>name: "Stockfish file .exe"</li></li>
+  <li>tg_token: "TELEGRAM BOT API TOKEN"</li>
+  <li>tg_myid: "YOUR TELEGRAM ID (to make the bot send you messages on Telegram)"</li>
+</ul>
+
 ## Important Updates
 -Now bot can play variants, using Fairy-Stockfish! 
 -Now bot can play even blitz or bullets if you want, improved the API calls to make it 10x faster!

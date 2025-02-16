@@ -1,0 +1,13 @@
+token: "insert_token"
+challenges_token: "insert ch token"
+log: "lichess-bot.log"
+engine:
+  dir: "Stockfish path"
+  name: "Stockfish file .exe"
+  options:
+    UCI_LimitStrength: true
+    UCI_Elo: 1500
+variant: "standard"
+max_games: 10
+tg_token: "insert telegram_token"
+tg_myid: "insert your telegram ID"
