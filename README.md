@@ -14,9 +14,6 @@ Create a config.yml file with:
 <ul>
   <li>token: "YOUR LICHESS BOT API TOKEN"</li>
   <li>challenges_token: "YOUR LICHESS CHALLENGES API TOKEN"</li>
-  <li> engine: 
-  <li>dir: "Stockfish path"</li>
-  <li>name: "Stockfish file .exe"</li></li>
   <li>tg_token: "TELEGRAM BOT API TOKEN"</li>
   <li>tg_myid: "YOUR TELEGRAM ID (to make the bot send you messages on Telegram)"</li>
 </ul>
