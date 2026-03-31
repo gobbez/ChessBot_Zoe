@@ -584,7 +584,7 @@ def handle_events():
 
             set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
             if set_challenge_loops < 100:
-                challenge_loops = 2000
+                challenge_loops = 502000
             else:
                 challenge_loops = set_challenge_loops
             print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
@@ -594,7 +594,7 @@ def handle_events():
 
             # Check challenges
             if challenge_loops % 5 == 0:
-                check_challenges()
+                # check_challenges()
                 pass
 
             # Stream every games

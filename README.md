@@ -5,6 +5,9 @@ Now bot can find Opening name and human moves, plus its 10x faster!
 Telegram Bot to access Lichess Bot results real time!
 Ollama chatbot to interact with users (work in progress)
 
+## Update 31/03/2026
+Created new file (revisited2026.py) that improves the quality and readability of old version (newrunzoe.py)!
+
 ## 🔗 INSTALLATION AND USAGE
 Clone the repo
 ```bash

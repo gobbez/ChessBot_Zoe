@@ -31,7 +31,7 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    global_csv = THIS_FOLDER / "database/Settings.csv"
+    global_csv = THIS_FOLDER / "../database/Settings.csv"
     df_global = pd.read_csv(global_csv)
     if action == 'get':
         if game_for == 'global':
